@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+android/app/build
+android/.gradle
+android/local.properties
+android/build
+*.local
+.DS_Store
+.vscode
+.tsbuild-node
+tsconfig.tsbuildinfo
+tsconfig.node.tsbuildinfo
+desktop.ini
