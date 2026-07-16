@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Note, Reminder } from '@/lib/types'
 import {
   fetchNotes, fetchReminders, upsertNote, upsertReminder, deleteReminder,
-  deleteNoteForever, emptyTrash, createBlankNote, createBlankReminder
+  deleteNoteForever as dbDeleteNote, emptyTrash as dbEmptyTrash,
+  createBlankNote, createBlankReminder
 } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './AuthContext'
@@ -179,12 +180,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const restoreNote = useCallback((id: string) => updateNote(id, { trashed: false, trashed_at: null }), [updateNote])
   const deleteForever = useCallback(async (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id))
-    await deleteNoteForever(id)
+    await dbDeleteNote(id)
   }, [])
   const emptyTrashAll = useCallback(async () => {
     if (!user) return
     setNotes((prev) => prev.filter((n) => !n.trashed))
-    await emptyTrash(user.id)
+    await dbEmptyTrash(user.id)
   }, [user])
 
   // ---- reminders ----
@@ -226,7 +227,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return
     const expired = notes.filter((n) => n.trashed && n.trashed_at && Date.now() - new Date(n.trashed_at).getTime() > TRASH_MS)
-    expired.forEach((n) => deleteNoteForever(n.id).catch(() => {}))
+    expired.forEach((n) => dbDeleteNote(n.id).catch(() => {}))
   }, [user, notes])
 
   const value: NotesCtx = {
