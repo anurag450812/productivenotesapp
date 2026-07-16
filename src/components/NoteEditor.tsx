@@ -76,11 +76,13 @@ export default function NoteEditor({ note, onClose }: Props) {
     })
   }
 
-  // Split lines into active (unchecked) and done (checked)
+  // Split lines: text/headings first, then unchecked tasks, then checked tasks
   if (!local?.lines) return null
   const hasTasks = local.lines.some((l) => l.type === 'task')
-  const activeLines = local.lines.filter((l) => l.type !== 'task' || !l.checked)
+  const textLines = local.lines.filter((l) => l.type !== 'task')
+  const uncheckedTasks = local.lines.filter((l) => l.type === 'task' && !l.checked)
   const doneLines = local.lines.filter((l) => l.type === 'task' && l.checked)
+  const activeLines = [...textLines, ...uncheckedTasks]
 
   return (
     <motion.div
@@ -127,11 +129,14 @@ export default function NoteEditor({ note, onClose }: Props) {
 
         {/* body */}
         <div className="px-3 py-2 overflow-y-auto">
-          {/* Active lines: text, headings, unchecked tasks */}
+          {/* Active lines: text/headings first, then unchecked tasks */}
           <LineEditor
             lines={activeLines}
             showCheckboxes={local.show_checkboxes}
-            onChange={(newActive) => commit({ lines: [...newActive, ...doneLines] })}
+            onChange={(newActive) => {
+              const sorted = [...newActive.filter((l) => l.type !== 'task'), ...newActive.filter((l) => l.type === 'task')]
+              commit({ lines: [...sorted, ...doneLines] })
+            }}
           />
 
           {/* Checked section divider */}

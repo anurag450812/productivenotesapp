@@ -58,6 +58,8 @@ export default function App() {
   const regularNotes = useMemo(() => unpinned.filter((n) => !n.is_reminder_note), [unpinned])
   const openNote = useMemo(() => notes.find((n) => n.id === openId) || null, [notes, openId])
 
+  const trashCount = useMemo(() => notes.filter((n) => n.trashed).length, [notes])
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
   }
@@ -105,8 +107,6 @@ export default function App() {
     if (selectionMode) { toggleSelect(id); return }
     setOpenId(id)
   }
-
-  const trashCount = useMemo(() => notes.filter((n) => n.trashed).length, [notes])
 
   return (
     <div className="min-h-screen bg-bg text-text">
