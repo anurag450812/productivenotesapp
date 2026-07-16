@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
 export default function AuthScreen() {
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, authError } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -41,6 +41,12 @@ export default function AuthScreen() {
         {!isSupabaseConfigured && (
           <div className="mb-4 text-xs rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 p-3">
             Supabase isn't configured. Copy <code>.env.example</code> to <code>.env</code> and add your project URL + anon key.
+          </div>
+        )}
+
+        {authError && (
+          <div className="mb-4 text-xs rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 p-3">
+            Connection error: {authError}
           </div>
         )}
 

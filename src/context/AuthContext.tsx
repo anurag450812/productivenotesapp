@@ -6,6 +6,7 @@ interface AuthCtx {
   session: Session | null
   user: User | null
   loading: boolean
+  authError: string | null
   signUp: (email: string, password: string) => Promise<{ error: string | null }>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -17,12 +18,24 @@ export const useAuth = () => useContext(Ctx)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('getSession error:', error.message)
+          setAuthError(error.message)
+        }
+        setSession(data.session)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error('Supabase connection failed:', err)
+        setAuthError('Cannot connect to Supabase. Check your .env credentials.')
+        setLoading(false)
+      })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -31,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user: session?.user ?? null,
     loading,
+    authError,
     async signUp(email, password) {
       const { error } = await supabase.auth.signUp({ email, password })
       return { error: error?.message ?? null }
