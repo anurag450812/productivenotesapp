@@ -4,6 +4,7 @@ import { Check, Square, Heading1, Type, GripVertical } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { NoteLine } from '@/lib/types'
 import { emptyLine } from '@/lib/db'
+import { useSettings } from '@/context/SettingsContext'
 
 interface Props {
   lines: NoteLine[]
@@ -14,7 +15,7 @@ interface Props {
 
 // Auto-grow input
 function AutoInput({
-  value, onChange, onEnter, onBackspaceEmpty, placeholder, className, ariaLabel
+  value, onChange, onEnter, onBackspaceEmpty, placeholder, className, ariaLabel, style
 }: {
   value: string
   onChange: (v: string) => void
@@ -23,6 +24,7 @@ function AutoInput({
   placeholder?: string
   className?: string
   ariaLabel?: string
+  style?: React.CSSProperties
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
@@ -40,6 +42,7 @@ function AutoInput({
       className={`line-input ${className ?? ''}`}
       placeholder={placeholder}
       value={value}
+      style={style}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -55,6 +58,7 @@ function AutoInput({
 }
 
 export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }: Props) {
+  const { settings } = useSettings()
   const update = (id: string, patch: Partial<NoteLine>) =>
     onChange(lines.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
@@ -151,11 +155,12 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
                 placeholder={line.type === 'heading' ? 'Heading' : line.type === 'task' ? 'List item' : 'Note'}
                 className={
                   line.type === 'heading'
-                    ? 'text-base font-semibold'
+                    ? 'font-semibold'
                     : isTask && line.checked
                     ? 'line-through text-muted'
                     : ''
                 }
+                style={line.type === 'heading' ? { fontSize: settings.headingFontSize } : undefined}
                 onChange={(v) => update(line.id, { text: v })}
                 onEnter={() => insertAfter(line.id, emptyLine(isTask ? 'task' : 'text'))}
                 onBackspaceEmpty={() => {

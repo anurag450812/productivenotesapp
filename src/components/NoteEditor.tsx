@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Pin, Archive, Trash2, Palette, CheckSquare, EyeOff, Eye, RotateCcw, X,
-  Image as ImageIcon, Bell, BellOff, Minimize2, Copy
+  Pin, Archive, Trash2, Palette, EyeOff, Eye, RotateCcw, X,
+  Image as ImageIcon, Bell, BellOff, Minimize2, Copy, ChevronDown, ChevronUp
 } from 'lucide-react'
 import type { Note } from '@/lib/types'
 import { useNotes } from '@/context/NotesContext'
 import { useTheme } from '@/context/ThemeContext'
+import { useSettings } from '@/context/SettingsContext'
 import { COLOR_ORDER, NOTE_COLORS, noteBg, noteBorder } from '@/lib/colors'
 import LineEditor from './LineEditor'
 import RemindersList from './RemindersList'
@@ -22,12 +23,13 @@ export default function NoteEditor({ note, onClose }: Props) {
   const { updateNote, saveNoteNow, trashNote, addNote } = useNotes()
   const { theme } = useTheme()
   const { user } = useAuth()
+  const { settings } = useSettings()
   const [local, setLocal] = useState<Note>(note)
   const [showPalette, setShowPalette] = useState(false)
+  const [collapseChecked, setCollapseChecked] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const dirtyRef = useRef(false)
 
-  // sync external changes when not dirty
   useEffect(() => {
     if (!dirtyRef.current) setLocal(note)
   }, [note])
@@ -57,8 +59,12 @@ export default function NoteEditor({ note, onClose }: Props) {
     commit({ image_url: data.publicUrl })
   }
 
-  const uncheckAll = () => {
-    commit({ lines: local.lines.map((l) => (l.type === 'task' ? { ...l, checked: false } : l)) })
+  const toggleCheckAll = () => {
+    const tasks = local.lines.filter((l) => l.type === 'task')
+    const allUnchecked = tasks.length > 0 && tasks.every((l) => !l.checked)
+    commit({
+      lines: local.lines.map((l) => (l.type === 'task' ? { ...l, checked: allUnchecked } : l))
+    })
   }
 
   const duplicate = () => {
@@ -69,6 +75,11 @@ export default function NoteEditor({ note, onClose }: Props) {
       is_reminder_note: false
     })
   }
+
+  // Split lines into active (unchecked) and done (checked)
+  const hasTasks = local.lines.some((l) => l.type === 'task')
+  const activeLines = local.lines.filter((l) => l.type !== 'task' || !l.checked)
+  const doneLines = local.lines.filter((l) => l.type === 'task' && l.checked)
 
   return (
     <motion.div
@@ -104,7 +115,8 @@ export default function NoteEditor({ note, onClose }: Props) {
             value={local.title}
             onChange={(e) => commit({ title: e.target.value })}
             placeholder="Title"
-            className="line-input text-lg font-semibold flex-1"
+            className="line-input font-semibold flex-1"
+            style={{ fontSize: settings.headingFontSize }}
           />
           <button
             onClick={() => commit({ pinned: !local.pinned })}
@@ -114,11 +126,48 @@ export default function NoteEditor({ note, onClose }: Props) {
 
         {/* body */}
         <div className="px-3 py-2 overflow-y-auto">
+          {/* Active lines: text, headings, unchecked tasks */}
           <LineEditor
-            lines={local.lines}
+            lines={activeLines}
             showCheckboxes={local.show_checkboxes}
-            onChange={(lines) => commit({ lines })}
+            onChange={(newActive) => commit({ lines: [...newActive, ...doneLines] })}
           />
+
+          {/* Checked section divider */}
+          {hasTasks && doneLines.length > 0 && (
+            <div className="my-2">
+              <button
+                onClick={() => setCollapseChecked((c) => !c)}
+                className="w-full flex items-center gap-2 py-1.5 text-sm text-muted hover:text-text transition-colors"
+              >
+                <div className="flex-1 h-px bg-border" />
+                <span className="flex items-center gap-1 text-xs font-medium whitespace-nowrap">
+                  {collapseChecked ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                  ✓ {doneLines.length} completed
+                </span>
+                <div className="flex-1 h-px bg-border" />
+              </button>
+            </div>
+          )}
+
+          {/* Done lines: checked tasks (collapsible) */}
+          <AnimatePresence initial={false}>
+            {hasTasks && doneLines.length > 0 && !collapseChecked && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <LineEditor
+                  lines={doneLines}
+                  showCheckboxes={local.show_checkboxes}
+                  onChange={(newDone) => commit({ lines: [...activeLines, ...newDone] })}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {local.is_reminder_note && <div className="mt-3"><RemindersList noteId={note.id} /></div>}
         </div>
 
@@ -135,7 +184,7 @@ export default function NoteEditor({ note, onClose }: Props) {
           <Tool title={local.show_checkboxes ? 'Hide checkboxes' : 'Show checkboxes'} onClick={() => commit({ show_checkboxes: !local.show_checkboxes })}>
             {local.show_checkboxes ? <Eye size={18} /> : <EyeOff size={18} />}
           </Tool>
-          <Tool title="Uncheck all items" onClick={uncheckAll}><RotateCcw size={18} /></Tool>
+          <Tool title="Toggle check all" onClick={toggleCheckAll}><RotateCcw size={18} /></Tool>
           <Tool title="Duplicate note" onClick={duplicate}><Copy size={18} /></Tool>
           <Tool title={local.collapsed ? 'Expand default' : 'Collapse by default'} onClick={() => commit({ collapsed: !local.collapsed })}>
             <Minimize2 size={18} />

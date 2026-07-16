@@ -5,10 +5,10 @@ import './index.css'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { NotesProvider } from './context/NotesContext'
+import { SettingsProvider } from './context/SettingsContext'
 import { App as CapApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 
-// Android hardware back closes modals / exits
 if (Capacitor.isNativePlatform()) {
   CapApp.addListener('backButton', () => {
     const ev = new KeyboardEvent('keydown', { key: 'Escape' })
@@ -21,7 +21,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider>
       <AuthProvider>
         <NotesProvider>
-          <App />
+          <SettingsProvider>
+            <App />
+          </SettingsProvider>
         </NotesProvider>
       </AuthProvider>
     </ThemeProvider>

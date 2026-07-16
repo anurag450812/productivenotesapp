@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Search, LayoutGrid, List, Sun, Moon, Archive, Trash2, NotebookPen,
-  Bell, X, Pin, RotateCcw, FileX2, Menu, Plus, CheckSquare
+  Bell, X, Pin, RotateCcw, FileX2, Menu, Plus, CheckSquare, Settings
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotes, TRASH_DAYS } from '@/context/NotesContext'
@@ -11,6 +11,7 @@ import type { Note } from '@/lib/types'
 import AuthScreen from '@/components/AuthScreen'
 import NoteCard from '@/components/NoteCard'
 import NoteEditor from '@/components/NoteEditor'
+import SettingsPanel from '@/components/SettingsPanel'
 import { Capacitor } from '@capacitor/core'
 
 type View = 'notes' | 'archive' | 'trash' | 'reminders'
@@ -27,6 +28,7 @@ export default function App() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
@@ -59,8 +61,13 @@ export default function App() {
   if (!user) return <AuthScreen />
 
   const startQuick = (asReminder = false, asChecklist = false) => {
-    const lines = asChecklist ? [{ id: Math.random().toString(36).slice(2), type: 'task' as const, text: '', checked: false }] : undefined
-    const n = addNote({ is_reminder_note: asReminder, show_checkboxes: true, lines })
+    const n = addNote({
+      is_reminder_note: asReminder,
+      show_checkboxes: true,
+      ...(asChecklist ? {
+        lines: [{ id: Math.random().toString(36).slice(2), type: 'task' as const, text: '', checked: false }]
+      } : {})
+    })
     setOpenId(n.id)
   }
 
@@ -91,6 +98,7 @@ export default function App() {
         theme={theme} toggleTheme={toggle} view={view}
         setView={(v: View) => { setView(v); setMenuOpen(false) }}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} signOut={signOut} email={user.email}
+        onSettings={() => setShowSettings(true)}
       />
 
       {selectionMode && (
@@ -126,7 +134,7 @@ export default function App() {
           <Section title="Pinned">
             <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
               onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} />
+              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
           </Section>
         )}
 
@@ -134,7 +142,7 @@ export default function App() {
           <Section title={view === 'notes' && pinned.length > 0 ? 'Others' : ''}>
             <NotesGrid notes={others} layout={layout} selected={selected} selectionMode={selectionMode}
               onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} />
+              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
           </Section>
         )}
 
@@ -152,6 +160,10 @@ export default function App() {
 
       <AnimatePresence>
         {openNote && <NoteEditor note={openNote} onClose={() => setOpenId(null)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       </AnimatePresence>
     </div>
   )
@@ -189,6 +201,11 @@ function TopBar(props: any) {
                   </button>
                 ))}
                 <div className="border-t border-border my-1.5" />
+                <button onClick={() => { props.onSettings(); props.setMenuOpen(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                  <Settings size={16} /> Settings
+                </button>
+                <div className="border-t border-border my-1.5" />
                 <div className="px-4 py-1.5 text-xs text-muted truncate">{props.email}</div>
                 <button onClick={() => { props.signOut(); props.setMenuOpen(false) }}
                   className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors">Sign out</button>
@@ -211,7 +228,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function NotesGrid(props: any) {
-  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, setSelection, onLongPress, isTouch } = props
+  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, setSelection, onLongPress, isTouch, onUpdateNote } = props
   const containerRef = useRef<HTMLDivElement>(null)
   const startRef = useRef<{ x: number; y: number } | null>(null)
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -245,7 +262,8 @@ function NotesGrid(props: any) {
       {notes.map((n: Note) => (
         <div key={n.id} data-note-card={n.id} className="break-inside-avoid mb-3">
           <NoteCard note={n} selected={selected.has(n.id)} selectionMode={selectionMode} view={layout}
-            onOpen={() => onOpen(n.id)} onToggleSelect={() => onToggleSelect(n.id)} onLongPress={() => onLongPress(n.id)} />
+            onOpen={() => onOpen(n.id)} onToggleSelect={() => onToggleSelect(n.id)} onLongPress={() => onLongPress(n.id)}
+            onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} />
         </div>
       ))}
       {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}

@@ -4,6 +4,7 @@ import { Pin, Bell, Check } from 'lucide-react'
 import type { Note } from '@/lib/types'
 import { useNotes } from '@/context/NotesContext'
 import { useTheme } from '@/context/ThemeContext'
+import { useSettings } from '@/context/SettingsContext'
 import { noteBg, noteBorder } from '@/lib/colors'
 import { relativeLabel } from '@/lib/reminders'
 
@@ -15,11 +16,13 @@ interface Props {
   onOpen: () => void
   onToggleSelect: () => void
   onLongPress: () => void
+  onPin?: () => void
 }
 
-export default function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect, onLongPress }: Props) {
+export default function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect, onLongPress, onPin }: Props) {
   const { sortedRemindersFor } = useNotes()
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pressed = useRef(false)
   const reminders = note.is_reminder_note ? sortedRemindersFor(note.id).slice(0, 3) : []
@@ -57,7 +60,7 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
       onTouchEnd={endPress}
       onTouchMove={endPress}
       onClick={handleClick}
-      className={`relative rounded-xl2 shadow-sm hover:shadow-md cursor-pointer transition-shadow select-none ${
+      className={`group relative rounded-xl2 shadow-sm hover:shadow-md cursor-pointer transition-shadow select-none ${
         isList ? 'w-full' : ''
       } ${selected ? 'ring-2 ring-amber-500' : ''}`}
       style={{
@@ -65,6 +68,17 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
         border: `1px solid ${noteBorder(note.color, theme === 'dark')}`
       }}
     >
+      {/* hover pin button - web only */}
+      {onPin && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPin() }}
+          className="absolute top-2 right-2 z-10 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 hover:bg-amber-500/20 text-muted hover:text-amber-500"
+          title={note.pinned ? 'Unpin' : 'Pin'}
+        >
+          <Pin size={14} fill={note.pinned ? 'currentColor' : 'none'} />
+        </button>
+      )}
+
       {/* selection checkbox overlay */}
       {selectionMode && (
         <div
@@ -78,10 +92,13 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
 
       <div className="p-3">
         {note.pinned && (
-          <Pin size={14} className="text-amber-500 mb-1" fill="currentColor" />
+          <Pin size={14} className="text-amber-500 mb-1 opacity-0 sm:opacity-100" fill="currentColor" />
         )}
 
-        <h3 className={`font-semibold leading-snug ${note.collapsed ? '' : 'mb-1'} ${isList ? 'text-base' : 'text-[15px]'}`}>
+        <h3
+          className={`font-semibold leading-snug ${note.collapsed ? '' : 'mb-1'} ${isList ? '' : ''}`}
+          style={{ fontSize: settings.headingFontSize }}
+        >
           {heading}
         </h3>
 
