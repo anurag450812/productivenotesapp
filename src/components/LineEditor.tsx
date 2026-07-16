@@ -64,11 +64,12 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
     const copy = [...lines]
     copy.splice(idx + 1, 0, nl)
     onChange(copy)
-    // focus new line shortly
-    setTimeout(() => {
-      const el = document.querySelector<HTMLTextAreaElement>(`[data-line-id="${nl.id}"]`)
-      el?.focus()
-    }, 10)
+    // focus the textarea inside the new line after React re-renders
+    requestAnimationFrame(() => {
+      const container = document.querySelector<HTMLDivElement>(`[data-line-id="${nl.id}"]`)
+      const textarea = container?.querySelector<HTMLTextAreaElement>('textarea')
+      textarea?.focus()
+    })
   }
 
   const removeLine = (id: string) => {
@@ -81,12 +82,15 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
     onChange(copy)
     const focusId = copy[Math.max(0, idx - 1)]?.id
     if (focusId) {
-      setTimeout(() => {
-        const el = document.querySelector<HTMLTextAreaElement>(`[data-line-id="${focusId}"]`)
-        el?.focus()
-        const len = el?.value.length ?? 0
-        el?.setSelectionRange(len, len)
-      }, 10)
+      requestAnimationFrame(() => {
+        const container = document.querySelector<HTMLDivElement>(`[data-line-id="${focusId}"]`)
+        const textarea = container?.querySelector<HTMLTextAreaElement>('textarea')
+        if (textarea) {
+          textarea.focus()
+          const len = textarea.value.length
+          textarea.setSelectionRange(len, len)
+        }
+      })
     }
   }
 
