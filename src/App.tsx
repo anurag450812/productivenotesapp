@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Search, LayoutGrid, List, Sun, Moon, Archive, Trash2, NotebookPen,
-  Bell, X, Pin, RotateCcw, FileX2, Menu, Plus, CheckSquare, Settings
+  Bell, X, Pin, RotateCcw, FileX2, Plus, CheckSquare, Settings, Check
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotes, TRASH_DAYS } from '@/context/NotesContext'
@@ -18,7 +18,7 @@ type View = 'notes' | 'archive' | 'trash' | 'reminders'
 
 export default function App() {
   const { user, loading, signOut } = useAuth()
-  const { notes, addNote, updateNote, trashNote, restoreNote, deleteForever } = useNotes()
+  const { notes, addNote, updateNote, trashNote, restoreNote, deleteForever, emptyTrashAll } = useNotes()
   const { theme, toggle } = useTheme()
   const [view, setView] = useState<View>('notes')
   const [layout, setLayout] = useState<'grid' | 'list'>(() =>
@@ -29,11 +29,12 @@ export default function App() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [menuOpen, setMenuOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
   const isTouch = Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches
-  const selectionMode = selected.size > 0
+  const selectionMode = selectMode || selected.size > 0
 
   const filtered = useMemo(() => {
     let list = notes
@@ -80,8 +81,10 @@ export default function App() {
       return s
     })
 
-  const clearSelection = () => setSelected(new Set())
+  const clearSelection = () => { setSelected(new Set()); setSelectMode(false) }
   const setSelection = (s: Set<string>) => setSelected(s)
+
+  const selectAll = () => setSelected(new Set(filtered.map((n) => n.id)))
 
   const bulk = (fn: (id: string) => void) => {
     selected.forEach(fn)
@@ -93,21 +96,36 @@ export default function App() {
     if (n) updateNote(id, { lines: n.lines.map((l) => (l.type === 'task' ? { ...l, checked: false } : l)) })
   }
 
+  const enterSelectMode = () => {
+    setSelectMode(true)
+    setSelected(new Set())
+  }
+
+  const handleNoteOpen = (id: string) => {
+    if (selectionMode) { toggleSelect(id); return }
+    setOpenId(id)
+  }
+
+  const trashCount = useMemo(() => notes.filter((n) => n.trashed).length, [notes])
+
   return (
     <div className="min-h-screen bg-bg text-text">
       <TopBar
         query={query} setQuery={setQuery} layout={layout} setLayout={setLayout}
         theme={theme} toggleTheme={toggle} view={view}
-        setView={(v: View) => { setView(v); setMenuOpen(false) }}
+        setView={(v: View) => { setView(v); setMenuOpen(false); setSelectMode(false); setSelected(new Set()) }}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} signOut={signOut} email={user.email}
         onSettings={() => setShowSettings(true)}
+        selectMode={selectMode} onSelectMode={enterSelectMode} onSelectDone={clearSelection}
       />
 
       {selectionMode && (
         <SelectionBar
           count={selected.size}
+          total={filtered.length}
           view={view}
           onClear={clearSelection}
+          onSelectAll={selectAll}
           onArchive={() => bulk((id) => updateNote(id, { archived: true }))}
           onTrash={() => bulk(trashNote)}
           onRestore={() => bulk(restoreNote)}
@@ -118,6 +136,7 @@ export default function App() {
       )}
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 pb-28 pt-4 safe-bottom">
+        {/* Take a note bar */}
         {view === 'notes' && !selectionMode && (
           <div
             className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
@@ -130,34 +149,58 @@ export default function App() {
           </div>
         )}
 
+        {/* Trash empty button */}
+        {view === 'trash' && trashCount > 0 && !selectionMode && (
+          <div className="mb-5 flex items-center justify-between">
+            <p className="text-xs text-muted">{trashCount} note{trashCount !== 1 ? 's' : ''} in trash · auto-deleted after {TRASH_DAYS} days</p>
+            <button
+              onClick={() => { if (window.confirm('Delete all notes in trash permanently?')) emptyTrashAll() }}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+            >
+              Empty trash
+            </button>
+          </div>
+        )}
+
         {filtered.length === 0 && <EmptyState view={view} />}
 
+        {/* Notes view: Pinned → Reminders → Notes */}
         {view === 'notes' && pinned.length > 0 && (
           <Section title="Pinned">
             <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
-              onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
+              onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+              onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
           </Section>
         )}
 
         {view === 'notes' && reminderNotes.length > 0 && (
           <Section title="Reminders">
             <NotesGrid notes={reminderNotes} layout={layout} selected={selected} selectionMode={selectionMode}
-              onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
+              onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+              onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
           </Section>
         )}
 
-        {regularNotes.length > 0 && (
-          <Section title={view === 'notes' && (pinned.length > 0 || reminderNotes.length > 0) ? 'Notes' : ''}>
+        {view === 'notes' && regularNotes.length > 0 && (
+          <Section title={pinned.length > 0 || reminderNotes.length > 0 ? 'Notes' : ''}>
             <NotesGrid notes={regularNotes} layout={layout} selected={selected} selectionMode={selectionMode}
-              onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
+              onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+              onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
           </Section>
         )}
 
+        {/* Archive / Reminders tab: show all filtered */}
+        {(view === 'archive' || view === 'reminders') && filtered.length > 0 && (
+          <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
+            onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+            onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+        )}
+
+        {/* Trash view: show trashed notes */}
         {view === 'trash' && filtered.length > 0 && (
-          <p className="text-xs text-muted text-center mt-4">Notes in trash are deleted forever after {TRASH_DAYS} days.</p>
+          <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
+            onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+            onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
         )}
       </main>
 
@@ -203,9 +246,20 @@ function TopBar(props: any) {
         <button onClick={props.toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Toggle theme">
           {props.theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
         </button>
+        {props.selectMode ? (
+          <button onClick={props.onSelectDone}
+            className="px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+            Done
+          </button>
+        ) : (
+          <button onClick={props.onSelectMode}
+            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Select notes">
+            <Check size={19} />
+          </button>
+        )}
         <div className="relative">
           <button onClick={() => props.setMenuOpen(!props.menuOpen)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted">
-            <Menu size={19} />
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </button>
           {props.menuOpen && (
             <>
@@ -263,7 +317,7 @@ function NotesGrid(props: any) {
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   const onMouseDown = (e: React.MouseEvent) => {
-    if (isTouch || selectionMode) return
+    if (isTouch) return
     if ((e.target as HTMLElement).closest('[data-note-card]')) return
     startRef.current = { x: e.clientX, y: e.clientY }
   }
@@ -301,15 +355,20 @@ function NotesGrid(props: any) {
 }
 
 function SelectionBar(props: any) {
-  const actions = props.view === 'trash'
+  const isTrash = props.view === 'trash'
+  const actions = isTrash
     ? [['Restore', RotateCcw, props.onRestore], ['Delete forever', FileX2, props.onDeleteForever]]
     : [['Pin', Pin, props.onPin], ['Uncheck all', CheckSquare, props.onUncheck], ['Archive', Archive, props.onArchive], ['Delete', Trash2, props.onTrash]]
+
   return (
     <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 inset-x-0 z-30 bg-surface border-b border-border shadow-md">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2">
         <button onClick={props.onClear} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10"><X size={19} /></button>
         <span className="text-sm font-medium">{props.count} selected</span>
+        <button onClick={props.onSelectAll} className="text-sm text-amber-500 hover:text-amber-600 ml-2 font-medium">
+          {props.count === props.total ? 'Deselect all' : 'Select all'}
+        </button>
         <div className="ml-auto flex items-center gap-1">
           {actions.map(([label, Icon, fn]: any) => (
             <button key={label} onClick={fn} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
