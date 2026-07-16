@@ -58,8 +58,9 @@ export default function App() {
   }
   if (!user) return <AuthScreen />
 
-  const startQuick = (asReminder = false) => {
-    const n = addNote({ is_reminder_note: asReminder })
+  const startQuick = (asReminder = false, asChecklist = false) => {
+    const lines = asChecklist ? [{ id: Math.random().toString(36).slice(2), type: 'task' as const, text: '', checked: false }] : undefined
+    const n = addNote({ is_reminder_note: asReminder, show_checkboxes: true, lines })
     setOpenId(n.id)
   }
 
@@ -114,7 +115,7 @@ export default function App() {
           >
             <Plus size={18} className="text-muted" />
             <span className="text-muted text-sm flex-1">Take a note…</span>
-            <button onClick={(e) => { e.stopPropagation(); startQuick(false) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="New checklist note"><CheckSquare size={18} /></button>
+            <button onClick={(e) => { e.stopPropagation(); startQuick(false, true) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="New checklist note"><CheckSquare size={18} /></button>
             <button onClick={(e) => { e.stopPropagation(); startQuick(true) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="New reminder note"><Bell size={18} /></button>
           </div>
         )}
