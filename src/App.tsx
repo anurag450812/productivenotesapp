@@ -170,8 +170,16 @@ export default function App() {
 }
 
 function TopBar(props: any) {
+  const tabs = [
+    { key: 'notes', label: 'Notes', Icon: NotebookPen },
+    { key: 'reminders', label: 'Reminders', Icon: Bell },
+    { key: 'archive', label: 'Archive', Icon: Archive },
+    { key: 'trash', label: 'Trash', Icon: Trash2 },
+  ] as const
+
   return (
     <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-lg border-b border-border">
+      {/* Row 1: Search + actions */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2">
         <div className="relative flex-1 max-w-xl">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -194,13 +202,6 @@ function TopBar(props: any) {
               <div className="fixed inset-0 z-10" onClick={() => props.setMenuOpen(false)} />
               <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
                 className="absolute right-0 mt-2 w-52 bg-surface border border-border rounded-xl shadow-xl z-20 py-1.5 overflow-hidden">
-                {([['notes', 'Notes', NotebookPen], ['reminders', 'Reminders', Bell], ['archive', 'Archive', Archive], ['trash', 'Trash', Trash2]] as const).map(([v, label, Icon]) => (
-                  <button key={v} onClick={() => props.setView(v)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${props.view === v ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                    <Icon size={16} /> {label}
-                  </button>
-                ))}
-                <div className="border-t border-border my-1.5" />
                 <button onClick={() => { props.onSettings(); props.setMenuOpen(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                   <Settings size={16} /> Settings
@@ -213,6 +214,24 @@ function TopBar(props: any) {
             </>
           )}
         </div>
+      </div>
+
+      {/* Row 2: View tabs */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 flex gap-1 pb-2 overflow-x-auto scrollbar-none">
+        {tabs.map(({ key, label, Icon }) => (
+          <button
+            key={key}
+            onClick={() => props.setView(key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              props.view === key
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                : 'text-muted hover:bg-black/5 dark:hover:bg-white/5'
+            }`}
+          >
+            <Icon size={15} />
+            {label}
+          </button>
+        ))}
       </div>
     </header>
   )

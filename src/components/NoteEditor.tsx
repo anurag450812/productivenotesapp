@@ -44,7 +44,7 @@ export default function NoteEditor({ note, onClose }: Props) {
   const bd = noteBorder(local.color, theme === 'dark')
 
   const close = async () => {
-    await saveNoteNow(note.id)
+    try { await saveNoteNow(note.id) } catch { /* ignore save errors on close */ }
     dirtyRef.current = false
     onClose()
   }
@@ -77,6 +77,7 @@ export default function NoteEditor({ note, onClose }: Props) {
   }
 
   // Split lines into active (unchecked) and done (checked)
+  if (!local?.lines) return null
   const hasTasks = local.lines.some((l) => l.type === 'task')
   const activeLines = local.lines.filter((l) => l.type !== 'task' || !l.checked)
   const doneLines = local.lines.filter((l) => l.type === 'task' && l.checked)
@@ -176,7 +177,7 @@ export default function NoteEditor({ note, onClose }: Props) {
           <Tool title={local.archived ? 'Unarchive' : 'Archive'} onClick={() => { commit({ archived: !local.archived }); close() }}>
             <Archive size={18} />
           </Tool>
-          <Tool title="Delete" onClick={() => { trashNote(note.id); close() }}><Trash2 size={18} /></Tool>
+          <Tool title="Move to trash" onClick={() => { trashNote(note.id); dirtyRef.current = false; onClose() }}><Trash2 size={18} /></Tool>
           <Tool title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon size={18} /></Tool>
           <Tool title={local.is_reminder_note ? 'Disable reminders' : 'Enable reminders'} onClick={() => commit({ is_reminder_note: !local.is_reminder_note })}>
             {local.is_reminder_note ? <Bell size={18} className="text-amber-500" /> : <BellOff size={18} />}
