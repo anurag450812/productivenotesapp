@@ -30,11 +30,6 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
-  }
-  if (!user) return <AuthScreen />
-
   const isTouch = Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches
   const selectionMode = selected.size > 0
 
@@ -54,9 +49,14 @@ export default function App() {
     return list
   }, [notes, view, query])
 
-  const pinned = filtered.filter((n) => n.pinned)
-  const others = filtered.filter((n) => !n.pinned)
-  const openNote = notes.find((n) => n.id === openId) || null
+  const pinned = useMemo(() => filtered.filter((n) => n.pinned), [filtered])
+  const others = useMemo(() => filtered.filter((n) => !n.pinned), [filtered])
+  const openNote = useMemo(() => notes.find((n) => n.id === openId) || null, [notes, openId])
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
+  }
+  if (!user) return <AuthScreen />
 
   const startQuick = (asReminder = false) => {
     const n = addNote({ is_reminder_note: asReminder })
