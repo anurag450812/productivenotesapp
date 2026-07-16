@@ -317,7 +317,7 @@ function NotesGrid(props: any) {
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   const onMouseDown = (e: React.MouseEvent) => {
-    if (isTouch) return
+    if (isTouch && !selectionMode) return // allow drag-select in selection mode on touch
     if ((e.target as HTMLElement).closest('[data-note-card]')) return
     startRef.current = { x: e.clientX, y: e.clientY }
   }

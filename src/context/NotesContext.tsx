@@ -175,8 +175,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [user]
   )
 
-  const trashNote = useCallback((id: string) => updateNote(id, { trashed: true, trashed_at: new Date().toISOString(), pinned: false }),
-    [updateNote])
+  const trashNote = useCallback((id: string) => {
+    updateNote(id, { trashed: true, trashed_at: new Date().toISOString(), pinned: false })
+    saveNoteNow(id) // immediate persist to avoid race with editor close
+  }, [updateNote, saveNoteNow])
   const restoreNote = useCallback((id: string) => updateNote(id, { trashed: false, trashed_at: null }), [updateNote])
   const deleteForever = useCallback(async (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id))
