@@ -52,7 +52,9 @@ export default function App() {
   }, [notes, view, query])
 
   const pinned = useMemo(() => filtered.filter((n) => n.pinned), [filtered])
-  const others = useMemo(() => filtered.filter((n) => !n.pinned), [filtered])
+  const unpinned = useMemo(() => filtered.filter((n) => !n.pinned), [filtered])
+  const reminderNotes = useMemo(() => unpinned.filter((n) => n.is_reminder_note), [unpinned])
+  const regularNotes = useMemo(() => unpinned.filter((n) => !n.is_reminder_note), [unpinned])
   const openNote = useMemo(() => notes.find((n) => n.id === openId) || null, [notes, openId])
 
   if (loading) {
@@ -138,15 +140,23 @@ export default function App() {
           </Section>
         )}
 
-        {others.length > 0 && (
-          <Section title={view === 'notes' && pinned.length > 0 ? 'Others' : ''}>
-            <NotesGrid notes={others} layout={layout} selected={selected} selectionMode={selectionMode}
+        {view === 'notes' && reminderNotes.length > 0 && (
+          <Section title="Reminders">
+            <NotesGrid notes={reminderNotes} layout={layout} selected={selected} selectionMode={selectionMode}
               onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
               onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
           </Section>
         )}
 
-        {view === 'trash' && others.length > 0 && (
+        {regularNotes.length > 0 && (
+          <Section title={view === 'notes' && (pinned.length > 0 || reminderNotes.length > 0) ? 'Notes' : ''}>
+            <NotesGrid notes={regularNotes} layout={layout} selected={selected} selectionMode={selectionMode}
+              onOpen={setOpenId} onToggleSelect={toggleSelect} setSelection={setSelection}
+              onLongPress={(id: string) => setSelected(new Set([id]))} isTouch={isTouch} onUpdateNote={updateNote} />
+          </Section>
+        )}
+
+        {view === 'trash' && filtered.length > 0 && (
           <p className="text-xs text-muted text-center mt-4">Notes in trash are deleted forever after {TRASH_DAYS} days.</p>
         )}
       </main>
