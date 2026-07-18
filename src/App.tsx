@@ -39,21 +39,27 @@ export default function App() {
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null)
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const selectedRef = useRef(selected)
+  const viewRef = useRef(view)
   useEffect(() => { selectedRef.current = selected }, [selected])
+  useEffect(() => { viewRef.current = view }, [view])
 
-  // --- Keyboard Delete to trash selected notes ---
+  // --- Keyboard Delete to trash/deleteForever selected notes ---
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedRef.current.size > 0 && !openId) {
         e.preventDefault()
-        selectedRef.current.forEach(trashNote)
+        if (viewRef.current === 'trash') {
+          selectedRef.current.forEach(deleteForever)
+        } else {
+          selectedRef.current.forEach(trashNote)
+        }
         setSelected(new Set())
         setSelectMode(false)
       }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [openId, trashNote])
+  }, [openId, trashNote, deleteForever])
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 

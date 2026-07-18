@@ -96,7 +96,6 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   const desktop = vw >= 640
   const editorW = desktop ? Math.min(640, vw - 32) : vw
-  const editorH = desktop ? Math.min(560, vh - 48) : vh * 0.88
 
   let initial: Record<string, any>
   let animate: Record<string, any>
@@ -106,22 +105,21 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
     const cx = noteRect.left + noteRect.width / 2
     const cy = noteRect.top + noteRect.height / 2
     const sX = noteRect.width / editorW
-    const sY = noteRect.height / editorH
-    const s = Math.min(sX, sY, 1)
-    const startTop = cy - (editorH * s) / 2
-    const startLeft = cx - (editorW * s) / 2
-    const endTop = desktop ? (vh - editorH) / 2 : vh - editorH
+    const s = Math.min(sX, 1)
+    const startTop = cy - noteRect.height / 2
+    const startLeft = cx - editorW * s / 2
+    const endTop = desktop ? '50%' : vh - 200
     const endLeft = (vw - editorW) / 2
 
-    initial = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, height: editorH, scale: s, borderRadius: 12, opacity: 1 }
-    animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, height: editorH, scale: 1, borderRadius: 16, opacity: 1 }
-    exit = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, height: editorH, scale: s, borderRadius: 12, opacity: 0 }
+    initial = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, scale: s, borderRadius: 12, opacity: 1 }
+    animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-50%' : 0, scale: 1, borderRadius: 16, opacity: 1 }
+    exit = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, scale: s, borderRadius: 12, opacity: 0 }
   } else {
-    const endTop = desktop ? (vh - editorH) / 2 : vh - editorH
+    const endTop = desktop ? '50%' : vh - 200
     const endLeft = (vw - editorW) / 2
-    initial = { position: 'fixed' as const, top: endTop + 40, left: endLeft, width: editorW, scale: 0.92, opacity: 0 }
-    animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, scale: 1, opacity: 1 }
-    exit = { position: 'fixed' as const, top: endTop + 20, left: endLeft, width: editorW, scale: 0.94, opacity: 0 }
+    initial = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-40%' : 40, scale: 0.92, opacity: 0 }
+    animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-50%' : 0, scale: 1, opacity: 1 }
+    exit = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-45%' : 20, scale: 0.94, opacity: 0 }
   }
 
   return (
@@ -137,8 +135,8 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       <motion.div
-        className="w-full flex flex-col overflow-hidden"
-        style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1, zIndex: 1, maxHeight: '92vh' }}
+        className="w-full flex flex-col max-h-[85vh] overflow-hidden"
+        style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1, zIndex: 1 }}
         initial={initial}
         animate={animate}
         exit={exit}
@@ -172,7 +170,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
         </div>
 
         {/* body */}
-        <div className="px-3 py-2 overflow-y-auto">
+        <div className="px-3 py-2 flex-1 min-h-0 overflow-y-auto">
           {/* Active lines: text/headings first, then unchecked tasks */}
           <LineEditor
             lines={activeLines}
@@ -221,7 +219,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
         </div>
 
         {/* toolbar */}
-        <div className="flex items-center gap-1 px-3 py-2 border-t border-black/5 dark:border-white/5 flex-wrap">
+        <div className="flex items-center gap-1 px-3 py-2 border-t border-black/5 dark:border-white/5 flex-wrap flex-shrink-0">
           <Tool title={local.archived ? 'Unarchive' : 'Archive'} onClick={() => { commit({ archived: !local.archived }); close() }}>
             <Archive size={18} />
           </Tool>
