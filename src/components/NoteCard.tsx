@@ -106,7 +106,7 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
           {...listeners}
           className="absolute top-1.5 right-1.5 z-10 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-opacity cursor-grab active:cursor-grabbing touch-none"
           style={{ opacity: isDragging ? 1 : undefined }}
-          onPointerDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => { listeners.onPointerDown?.(e as any); e.stopPropagation() }}
         >
           <GripVertical size={14} className="text-muted/60" />
         </div>
