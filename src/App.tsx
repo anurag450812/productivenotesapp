@@ -180,6 +180,16 @@ export default function App() {
   }
   const enterSelectMode = () => { setSelectMode(true); setSelected(new Set()) }
 
+  // close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-menu-dropdown]')) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
   const addToSidebar = (id: string) => {
     setSidebarNotes((prev) => prev.includes(id) ? prev : [...prev, id])
     setSidebarOpen(true)
@@ -187,11 +197,20 @@ export default function App() {
   const removeFromSidebar = (id: string) => setSidebarNotes((prev) => prev.filter((n) => n !== id))
   const bulkAddToSidebar = () => { selected.forEach(addToSidebar); clearSelection() }
 
+  const toggleSidebarTask = (noteId: string, lineId: string) => {
+    const note = notes.find((n) => n.id === noteId)
+    if (!note) return
+    const updatedLines = note.lines.map((l) => l.id === lineId ? { ...l, checked: !l.checked } : l)
+    updateNote(noteId, { lines: updatedLines })
+  }
+
   const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'others') => {
     const { active, over } = event
     setIsDragging(false)
     // always check right edge first for sidebar drop
-    if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < 80) {
+    // when sidebar is open, the drop zone covers the full sidebar width (320px)
+    const dropThreshold = sidebarOpen ? 320 : 80
+    if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < dropThreshold) {
       addToSidebar(active.id as string)
       return
     }
@@ -303,7 +322,7 @@ export default function App() {
 
       {/* drag-to-sidebar drop zone indicator */}
       {isDragging && (
-        <div className="fixed right-0 top-0 bottom-0 w-20 z-[42] pointer-events-none flex items-center justify-center">
+        <div className={`fixed right-0 top-0 bottom-0 z-[42] pointer-events-none flex items-center justify-center ${sidebarOpen ? 'w-80' : 'w-20'}`}>
           <div className="h-2/3 w-1 rounded-full bg-amber-500/30 animate-pulse" />
         </div>
       )}
@@ -318,7 +337,8 @@ export default function App() {
       )}
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}
-        noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} />
+        noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar}
+        isDragging={isDragging} onToggleTask={toggleSidebarTask} />
 
       <AnimatePresence>
         {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
@@ -370,25 +390,22 @@ function TopBar(props: any) {
             <Check size={19} />
           </button>
         )}
-        <div className="relative">
+        <div className="relative" data-menu-dropdown>
           <button onClick={() => props.setMenuOpen(!props.menuOpen)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </button>
           {props.menuOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => props.setMenuOpen(false)} />
-              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 mt-2 w-52 bg-surface border border-border rounded-xl shadow-xl z-20 py-1.5 overflow-hidden">
-                <button onClick={() => { props.onSettings(); props.setMenuOpen(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                  <Settings size={16} /> Settings
-                </button>
-                <div className="border-t border-border my-1.5" />
-                <div className="px-4 py-1.5 text-xs text-muted truncate">{props.email}</div>
-                <button onClick={() => { props.signOut(); props.setMenuOpen(false) }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors">Sign out</button>
-              </motion.div>
-            </>
+            <motion.div data-menu-dropdown initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              className="absolute right-0 mt-2 w-52 bg-surface border border-border rounded-xl shadow-xl z-30 py-1.5 overflow-hidden">
+              <button onClick={() => { props.onSettings(); props.setMenuOpen(false) }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                <Settings size={16} /> Settings
+              </button>
+              <div className="border-t border-border my-1.5" />
+              <div className="px-4 py-1.5 text-xs text-muted truncate">{props.email}</div>
+              <button onClick={() => { props.signOut(); props.setMenuOpen(false) }}
+                className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors">Sign out</button>
+            </motion.div>
           )}
         </div>
       </div>

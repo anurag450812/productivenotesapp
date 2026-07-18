@@ -11,9 +11,11 @@ interface Props {
   noteIds: string[]
   notes: Note[]
   onRemove: (id: string) => void
+  isDragging?: boolean
+  onToggleTask?: (noteId: string, lineId: string) => void
 }
 
-export default function Sidebar({ open, onClose, noteIds, notes, onRemove }: Props) {
+export default function Sidebar({ open, onClose, noteIds, notes, onRemove, isDragging, onToggleTask }: Props) {
   const { theme } = useTheme()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -34,7 +36,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove }: Pro
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-80 z-[51] bg-surface border-l border-border shadow-2xl flex flex-col"
+            className={`fixed right-0 top-0 bottom-0 w-full sm:w-80 z-[51] bg-surface border-l border-border shadow-2xl flex flex-col ${isDragging ? 'pointer-events-none' : ''}`}
           >
             {/* header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -116,11 +118,14 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove }: Pro
                                     }`}
                                   >
                                     {l.type === 'task' && note.show_checkboxes && (
-                                      <span className={`mt-1.5 w-3 h-3 rounded-sm border shrink-0 flex items-center justify-center ${
-                                        l.checked ? 'bg-amber-500 border-amber-500' : 'border-muted/50'
-                                      }`}>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); onToggleTask?.(note.id, l.id) }}
+                                        className={`mt-1.5 w-3 h-3 rounded-sm border shrink-0 flex items-center justify-center transition-colors ${
+                                          l.checked ? 'bg-amber-500 border-amber-500' : 'border-muted/50 hover:border-amber-500/50'
+                                        }`}
+                                      >
                                         {l.checked && <Check size={9} strokeWidth={3} className="text-white" />}
-                                      </span>
+                                      </button>
                                     )}
                                     <span className={l.type === 'task' && l.checked ? 'line-through text-muted' : ''}>
                                       {l.text}
