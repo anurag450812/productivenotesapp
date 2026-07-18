@@ -360,7 +360,7 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} onAddToSidebar={() => addToSidebar(openNote.id)} />}
+        {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} onAddToSidebar={() => addToSidebar(openNote.id)} sidebarWidth={isDesktop ? sidebarWidth : 0} />}
       </AnimatePresence>
 
       <ReminderPopup />

@@ -19,9 +19,10 @@ interface Props {
   noteRect?: DOMRect | null
   onClose: () => void
   onAddToSidebar?: () => void
+  sidebarWidth?: number
 }
 
-export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar }: Props) {
+export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, sidebarWidth = 0 }: Props) {
   const { updateNote, saveNoteNow, trashNote, addNote, deleteForever } = useNotes()
   const { theme } = useTheme()
   const { user } = useAuth()
@@ -125,9 +126,10 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar }: 
 
   return (
     <>
-      {/* backdrop — z-50 */}
+      {/* backdrop — z-50, stops before sidebar */}
       <motion.div
         className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        style={{ right: sidebarWidth }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -135,18 +137,19 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar }: 
         onClick={() => close(true)}
       />
 
-      {/* content card — z-[52] so sidebar at z-[51] stays visible */}
-      <div className="fixed inset-0 z-[52] pointer-events-none" onClick={() => close(true)}>
-        <motion.div
-          data-note-editor
-          className="pointer-events-auto w-full flex flex-col max-h-[85vh] overflow-hidden"
-          style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1 }}
-          initial={initial}
-          animate={animate}
-          exit={exit}
-          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-          onClick={(e) => e.stopPropagation()}
-        >
+      {/* content card — z-[52], centered in area left of sidebar */}
+      <div className="fixed inset-0 z-[52] pointer-events-none" style={{ right: sidebarWidth }} onClick={() => close(true)}>
+        <div className="w-full h-full flex items-center justify-center p-4">
+          <motion.div
+            data-note-editor
+            className="pointer-events-auto w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1 }}
+            initial={initial}
+            animate={animate}
+            exit={exit}
+            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+            onClick={(e) => e.stopPropagation()}
+          >
         {/* image */}
         {local.image_url && (
           <div className="relative">
@@ -270,6 +273,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar }: 
           </motion.div>
         )}
       </motion.div>
+      </div>
       </div>
     </>
   )
