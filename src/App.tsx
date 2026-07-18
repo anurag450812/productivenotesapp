@@ -39,6 +39,10 @@ export default function App() {
   const isTouch = Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches
   const selectionMode = selectMode || selected.size > 0
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
   const filtered = useMemo(() => {
     let list = notes
     if (view === 'notes') list = notes.filter((n) => !n.archived && !n.trashed)
@@ -105,10 +109,6 @@ export default function App() {
     setSelectMode(true)
     setSelected(new Set())
   }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  )
 
   const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'regular' | 'reminder') => {
     const { active, over } = event
