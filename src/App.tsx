@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Search, LayoutGrid, List, Sun, Moon, Archive, Trash2, NotebookPen,
-  Bell, X, Pin, RotateCcw, FileX2, Plus, CheckSquare, Settings, Check, Monitor
+  Bell, X, Pin, RotateCcw, FileX2, Plus, CheckSquare, Settings, Check, Monitor, PanelRight
 } from 'lucide-react'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -15,6 +15,7 @@ import AuthScreen from '@/components/AuthScreen'
 import NoteCard from '@/components/NoteCard'
 import NoteEditor from '@/components/NoteEditor'
 import SettingsPanel from '@/components/SettingsPanel'
+import Sidebar from '@/components/Sidebar'
 import { Capacitor } from '@capacitor/core'
 
 type View = 'notes' | 'archive' | 'trash' | 'reminders'
@@ -35,24 +36,45 @@ export default function App() {
   const [selectMode, setSelectMode] = useState(false)
   const [noteRect, setNoteRect] = useState<DOMRect | null>(null)
 
-  // marquee state (lifted to App for full-page coverage)
+  // marquee
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null)
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const selectedRef = useRef(selected)
+  const selectModeRef = useRef(selectMode)
   const viewRef = useRef(view)
   useEffect(() => { selectedRef.current = selected }, [selected])
+  useEffect(() => { selectModeRef.current = selectMode }, [selectMode])
   useEffect(() => { viewRef.current = view }, [view])
 
-  // --- Keyboard Delete to trash/deleteForever selected notes ---
+  // sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarNotes, setSidebarNotes] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('sidebarNotes') || '[]') } catch { return [] }
+  })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragPosRef = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => { localStorage.setItem('sidebarNotes', JSON.stringify(sidebarNotes)) }, [sidebarNotes])
+
+  // auto-open sidebar when note editor opens (if sidebar has notes)
+  useEffect(() => {
+    if (openId && sidebarNotes.length > 0) setSidebarOpen(true)
+  }, [openId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // track pointer during drag for sidebar drop detection
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => { dragPosRef.current = { x: e.clientX, y: e.clientY } }
+    document.addEventListener('pointermove', onMove, { passive: true })
+    return () => document.removeEventListener('pointermove', onMove)
+  }, [])
+
+  // keyboard delete
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedRef.current.size > 0 && !openId) {
         e.preventDefault()
-        if (viewRef.current === 'trash') {
-          selectedRef.current.forEach(deleteForever)
-        } else {
-          selectedRef.current.forEach(trashNote)
-        }
+        if (viewRef.current === 'trash') selectedRef.current.forEach(deleteForever)
+        else selectedRef.current.forEach(trashNote)
         setSelected(new Set())
         setSelectMode(false)
       }
@@ -70,20 +92,20 @@ export default function App() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
-  // --- Document-level marquee (drag-select from anywhere on page) ---
+  // --- Document-level marquee ---
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
       if (Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches) return
       const target = e.target as HTMLElement
       if (target.closest('button') || target.closest('input') || target.closest('header') || target.closest('[data-note-editor]')) return
       if (target.closest('[data-note-card]')) return
-      if (selectedRef.current.size > 0) {
+      // fix: clear selection mode even when selected is empty
+      if (selectedRef.current.size > 0 || selectModeRef.current) {
         setSelected(new Set())
         setSelectMode(false)
       }
       marqueeStartRef.current = { x: e.clientX, y: e.clientY }
     }
-
     const onPointerMove = (e: PointerEvent) => {
       if (!marqueeStartRef.current) return
       const s = marqueeStartRef.current
@@ -100,9 +122,7 @@ export default function App() {
       })
       setSelected(next)
     }
-
     const onPointerUp = () => { marqueeStartRef.current = null; setMarquee(null) }
-
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('pointermove', onPointerMove)
     document.addEventListener('pointerup', onPointerUp)
@@ -119,12 +139,9 @@ export default function App() {
     else if (view === 'archive') list = notes.filter((n) => n.archived && !n.trashed)
     else if (view === 'trash') list = notes.filter((n) => n.trashed)
     else if (view === 'reminders') list = notes.filter((n) => n.is_reminder_note && !n.trashed && !n.archived)
-
     if (query.trim()) {
       const q = query.toLowerCase()
-      list = list.filter(
-        (n) => n.title.toLowerCase().includes(q) || n.lines.some((l) => l.text.toLowerCase().includes(q))
-      )
+      list = list.filter((n) => n.title.toLowerCase().includes(q) || n.lines.some((l) => l.text.toLowerCase().includes(q)))
     }
     return list
   }, [notes, view, query])
@@ -132,54 +149,49 @@ export default function App() {
   const pinned = useMemo(() => filtered.filter((n) => n.pinned), [filtered])
   const unpinned = useMemo(() => filtered.filter((n) => !n.pinned), [filtered])
   const openNote = useMemo(() => notes.find((n) => n.id === openId) || null, [notes, openId])
-
   const trashCount = useMemo(() => notes.filter((n) => n.trashed).length, [notes])
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
   if (!user) return <AuthScreen />
 
   const startQuick = (asReminder = false, asChecklist = false) => {
     const n = addNote({
       is_reminder_note: asReminder,
       show_checkboxes: true,
-      ...(asChecklist ? {
-        lines: [{ id: Math.random().toString(36).slice(2), type: 'task' as const, text: '', checked: false }]
-      } : {})
+      ...(asChecklist ? { lines: [{ id: Math.random().toString(36).slice(2), type: 'task' as const, text: '', checked: false }] } : {})
     })
     setOpenId(n.id)
   }
 
   const toggleSelect = (id: string) =>
-    setSelected((prev) => {
-      const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
-      return s
-    })
+    setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
 
   const clearSelection = () => { setSelected(new Set()); setSelectMode(false) }
-
   const selectAll = () => setSelected(new Set(filtered.map((n) => n.id)))
-
-  const bulk = (fn: (id: string) => void) => {
-    selected.forEach(fn)
-    clearSelection()
-  }
-
+  const bulk = (fn: (id: string) => void) => { selected.forEach(fn); clearSelection() }
   const uncheck = (id: string) => {
     const n = notes.find((x) => x.id === id)
     if (n) updateNote(id, { lines: n.lines.map((l) => (l.type === 'task' ? { ...l, checked: false } : l)) })
   }
+  const enterSelectMode = () => { setSelectMode(true); setSelected(new Set()) }
 
-  const enterSelectMode = () => {
-    setSelectMode(true)
-    setSelected(new Set())
+  const addToSidebar = (id: string) => {
+    setSidebarNotes((prev) => prev.includes(id) ? prev : [...prev, id])
+    setSidebarOpen(true)
   }
+  const removeFromSidebar = (id: string) => setSidebarNotes((prev) => prev.filter((n) => n !== id))
 
   const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'others') => {
     const { active, over } = event
-    if (!over || active.id === over.id) return
+    setIsDragging(false)
+    if (!over) {
+      // dropped on empty space — check right edge for sidebar
+      if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < 80) {
+        addToSidebar(active.id as string)
+      }
+      return
+    }
+    if (active.id === over.id) return
     reorderNotes(active.id as string, over.id as string, section)
   }
 
@@ -188,6 +200,8 @@ export default function App() {
     setNoteRect(rect || null)
     setOpenId(id)
   }
+
+  const onDndStart = () => setIsDragging(true)
 
   return (
     <div className="min-h-screen bg-bg text-text">
@@ -198,18 +212,15 @@ export default function App() {
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} signOut={signOut} email={user.email}
         onSettings={() => setShowSettings(true)}
         selectMode={selectMode} onSelectMode={enterSelectMode} onSelectDone={clearSelection}
+        sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
       />
 
       {selected.size > 0 && (
         <SelectionBar
-          count={selected.size}
-          total={filtered.length}
-          view={view}
-          onClear={clearSelection}
-          onSelectAll={selectAll}
+          count={selected.size} total={filtered.length} view={view}
+          onClear={clearSelection} onSelectAll={selectAll}
           onArchive={() => bulk((id) => updateNote(id, { archived: true }))}
-          onTrash={() => bulk(trashNote)}
-          onRestore={() => bulk(restoreNote)}
+          onTrash={() => bulk(trashNote)} onRestore={() => bulk(restoreNote)}
           onDeleteForever={() => bulk(deleteForever)}
           onPin={() => bulk((id) => updateNote(id, { pinned: true }))}
           onUncheck={() => bulk(uncheck)}
@@ -217,12 +228,9 @@ export default function App() {
       )}
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 pb-28 pt-4 safe-bottom">
-        {/* Take a note bar — always visible in notes view */}
         {view === 'notes' && (
-          <div
-            className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
-            onClick={() => startQuick(false)}
-          >
+          <div className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
+            onClick={() => startQuick(false)}>
             <Plus size={18} className="text-muted" />
             <span className="text-muted text-sm flex-1">Take a note…</span>
             <button onClick={(e) => { e.stopPropagation(); startQuick(false, true) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="New checklist note"><CheckSquare size={18} /></button>
@@ -230,25 +238,19 @@ export default function App() {
           </div>
         )}
 
-        {/* Trash empty button */}
         {view === 'trash' && trashCount > 0 && !selectionMode && (
           <div className="mb-5 flex items-center justify-between">
             <p className="text-xs text-muted">{trashCount} note{trashCount !== 1 ? 's' : ''} in trash · auto-deleted after {TRASH_DAYS} days</p>
-            <button
-              onClick={() => { if (window.confirm('Delete all notes in trash permanently?')) emptyTrashAll() }}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
-            >
-              Empty trash
-            </button>
+            <button onClick={() => { if (window.confirm('Delete all notes in trash permanently?')) emptyTrashAll() }}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors">Empty trash</button>
           </div>
         )}
 
         {filtered.length === 0 && <EmptyState view={view} />}
 
-        {/* Notes view: Pinned → Others (all unpinned together) */}
         {view === 'notes' && pinned.length > 0 && (
           <Section title="Pinned">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'pinned')}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDndStart} onDragEnd={(e) => handleDragEnd(e, 'pinned')}>
               <SortableContext items={pinned.map((n) => n.id)} strategy={rectSortingStrategy}>
                 <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
                   onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
@@ -260,7 +262,7 @@ export default function App() {
 
         {view === 'notes' && unpinned.length > 0 && (
           <Section title={pinned.length > 0 ? 'Notes' : ''}>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'others')}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDndStart} onDragEnd={(e) => handleDragEnd(e, 'others')}>
               <SortableContext items={unpinned.map((n) => n.id)} strategy={rectSortingStrategy}>
                 <NotesGrid notes={unpinned} layout={layout} selected={selected} selectionMode={selectionMode}
                   onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
@@ -270,9 +272,8 @@ export default function App() {
           </Section>
         )}
 
-        {/* Archive / Reminders tab: show all filtered */}
         {(view === 'archive' || view === 'reminders') && filtered.length > 0 && (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'others')}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDndStart} onDragEnd={(e) => handleDragEnd(e, 'others')}>
             <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
               <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
                 onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
@@ -281,7 +282,6 @@ export default function App() {
           </DndContext>
         )}
 
-        {/* Trash view: show trashed notes */}
         {view === 'trash' && filtered.length > 0 && (
           <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
             onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
@@ -296,8 +296,28 @@ export default function App() {
         </button>
       )}
 
-      {/* Selection marquee */}
-      {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+      {/* drag-to-sidebar drop zone indicator */}
+      {isDragging && (
+        <div className="fixed right-0 top-0 bottom-0 w-20 z-[42] pointer-events-none flex items-center justify-center">
+          <div className="h-2/3 w-1 rounded-full bg-amber-500/30 animate-pulse" />
+        </div>
+      )}
+
+      {/* sidebar toggle tab (when closed) */}
+      {!sidebarOpen && (
+        <button onClick={() => setSidebarOpen(true)}
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-surface border border-border border-r-0 rounded-l-lg px-1.5 py-3 text-muted hover:text-amber-500 transition-colors shadow-md hidden sm:block"
+          title="Open sidebar">
+          <PanelRight size={16} />
+        </button>
+      )}
+
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}
+        noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} />
+
+      <AnimatePresence>
+        {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+      </AnimatePresence>
 
       <AnimatePresence>
         {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} />}
@@ -320,7 +340,6 @@ function TopBar(props: any) {
 
   return (
     <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-lg border-b border-border">
-      {/* Row 1: Search + actions */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2">
         <div className="relative flex-1 max-w-xl">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -334,11 +353,12 @@ function TopBar(props: any) {
         <button onClick={props.toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title={`Theme: ${props.themeMode}`}>
           {props.themeMode === 'system' ? <Monitor size={19} /> : props.themeMode === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
         </button>
+        <button onClick={props.onToggleSidebar} className={`p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors hidden sm:block ${props.sidebarOpen ? 'text-amber-500' : 'text-muted'}`} title="Toggle sidebar">
+          <PanelRight size={19} />
+        </button>
         {props.selectMode ? (
           <button onClick={props.onSelectDone}
-            className="px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors">
-            Done
-          </button>
+            className="px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors">Done</button>
         ) : (
           <button onClick={props.onSelectMode}
             className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Select notes">
@@ -367,21 +387,13 @@ function TopBar(props: any) {
           )}
         </div>
       </div>
-
-      {/* Row 2: View tabs */}
       <div className="max-w-6xl mx-auto px-3 sm:px-6 flex gap-1 pb-2 overflow-x-auto scrollbar-none">
         {tabs.map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            onClick={() => props.setView(key)}
+          <button key={key} onClick={() => props.setView(key)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              props.view === key
-                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                : 'text-muted hover:bg-black/5 dark:hover:bg-white/5'
-            }`}
-          >
-            <Icon size={15} />
-            {label}
+              props.view === key ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'text-muted hover:bg-black/5 dark:hover:bg-white/5'
+            }`}>
+            <Icon size={15} />{label}
           </button>
         ))}
       </div>
@@ -400,7 +412,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function NotesGrid(props: any) {
   const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote } = props
-
   return (
     <div className={layout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}>
       {notes.map((n: Note) => (
@@ -419,7 +430,6 @@ function SelectionBar(props: any) {
   const actions = isTrash
     ? [['Restore', RotateCcw, props.onRestore], ['Delete forever', FileX2, props.onDeleteForever]]
     : [['Pin', Pin, props.onPin], ['Uncheck all', CheckSquare, props.onUncheck], ['Archive', Archive, props.onArchive], ['Delete', Trash2, props.onTrash]]
-
   return (
     <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 inset-x-0 z-30 bg-surface border-b border-border shadow-md">
