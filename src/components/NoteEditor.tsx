@@ -30,6 +30,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   const [collapseChecked, setCollapseChecked] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const dirtyRef = useRef(false)
+  const [isClosing, setIsClosing] = useState(false)
 
   useEffect(() => {
     if (!dirtyRef.current) setLocal(note)
@@ -54,7 +55,8 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
     }
     try { await saveNoteNow(note.id) } catch { /* ignore save errors on close */ }
     dirtyRef.current = false
-    onClose()
+    setIsClosing(true)
+    setTimeout(() => onClose(), 200)
   }
 
   const onImage = async (file: File) => {
@@ -92,22 +94,54 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   const doneLines = local.lines.filter((l) => l.type === 'task' && l.checked)
   const activeLines = [...textLines, ...uncheckedTasks]
 
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 640
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  const desktop = vw >= 640
+  const editorW = desktop ? Math.min(640, vw - 32) : vw
+  const editorH = desktop ? Math.min(560, vh - 48) : vh * 0.88
+
+  let initial: Record<string, any>
+  let animate: Record<string, any>
+  let exit: Record<string, any>
+
+  if (noteRect && !isClosing) {
+    const cx = noteRect.left + noteRect.width / 2
+    const cy = noteRect.top + noteRect.height / 2
+    const sX = noteRect.width / editorW
+    const sY = noteRect.height / editorH
+    const s = Math.min(sX, sY, 1)
+    const startTop = cy - (editorH * s) / 2
+    const startLeft = cx - (editorW * s) / 2
+    const endTop = desktop ? (vh - editorH) / 2 : vh - editorH
+    const endLeft = (vw - editorW) / 2
+
+    initial = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, height: editorH, scale: s, borderRadius: 12, opacity: 1 }
+    animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, height: editorH, scale: 1, borderRadius: 16, opacity: 1 }
+    exit = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, height: editorH, scale: s, borderRadius: 12, opacity: 0 }
+  } else {
+    initial = { y: 40, scale: 0.92, opacity: 0 }
+    animate = { y: 0, scale: 1, opacity: 1 }
+    exit = { y: 20, scale: 0.94, opacity: 0 }
+  }
+
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-50"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
       onClick={close}
     >
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
       <motion.div
-        className="w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
-        style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1 }}
-        initial={{ scale: 0.92, opacity: 0, y: 24 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.94, opacity: 0, y: 16 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        className="w-full flex flex-col overflow-hidden"
+        style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1, zIndex: 1, maxHeight: '92vh' }}
+        initial={initial}
+        animate={animate}
+        exit={exit}
+        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* image */}
@@ -190,7 +224,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
           <Tool title={local.archived ? 'Unarchive' : 'Archive'} onClick={() => { commit({ archived: !local.archived }); close() }}>
             <Archive size={18} />
           </Tool>
-          <Tool title="Move to trash" onClick={() => { trashNote(note.id); dirtyRef.current = false; onClose() }}><Trash2 size={18} /></Tool>
+          <Tool title="Move to trash" onClick={() => { trashNote(note.id); dirtyRef.current = false; setIsClosing(true); setTimeout(() => onClose(), 200) }}><Trash2 size={18} /></Tool>
           <Tool title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon size={18} /></Tool>
           <Tool title={local.is_reminder_note ? 'Disable reminders' : 'Enable reminders'} onClick={() => commit({ is_reminder_note: !local.is_reminder_note })}>
             {local.is_reminder_note ? <Bell size={18} className="text-amber-500" /> : <BellOff size={18} />}
