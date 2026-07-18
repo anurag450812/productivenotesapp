@@ -15,12 +15,13 @@ interface Props {
 
 // Auto-grow input
 function AutoInput({
-  value, onChange, onEnter, onBackspaceEmpty, placeholder, className, ariaLabel, style
+  value, onChange, onEnter, onBackspaceEmpty, onPaste, placeholder, className, ariaLabel, style
 }: {
   value: string
   onChange: (v: string) => void
   onEnter: () => void
   onBackspaceEmpty: () => void
+  onPaste?: (text: string) => void
   placeholder?: string
   className?: string
   ariaLabel?: string
@@ -51,6 +52,13 @@ function AutoInput({
         } else if (e.key === 'Backspace' && value === '') {
           e.preventDefault()
           onBackspaceEmpty()
+        }
+      }}
+      onPaste={(e) => {
+        const text = e.clipboardData.getData('text')
+        if (text.includes('\n') || text.includes('\r')) {
+          e.preventDefault()
+          onPaste?.(text)
         }
       }}
     />
@@ -112,6 +120,32 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
     update(id, { type: next, checked: next === 'task' ? line.checked ?? false : undefined })
   }
 
+  const handlePaste = (id: string, text: string) => {
+    const idx = lines.findIndex((l) => l.id === id)
+    if (idx === -1) return
+    const line = lines[idx]
+    const pastedLines = text.split(/\r?\n/)
+    const newLines: NoteLine[] = pastedLines.map((t) => ({
+      id: nanoid(12),
+      type: line.type,
+      text: t,
+      ...(line.type === 'task' ? { checked: false } : {})
+    }))
+    const copy = [...lines]
+    copy.splice(idx, 1, ...newLines)
+    onChange(copy)
+    const lastNewId = newLines[newLines.length - 1].id
+    requestAnimationFrame(() => {
+      const container = document.querySelector<HTMLDivElement>(`[data-line-id="${lastNewId}"]`)
+      const textarea = container?.querySelector<HTMLTextAreaElement>('textarea')
+      if (textarea) {
+        textarea.focus()
+        const len = textarea.value.length
+        textarea.setSelectionRange(len, len)
+      }
+    })
+  }
+
   return (
     <div className="space-y-0.5">
       {lines.map((line) => {
@@ -162,6 +196,7 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
                 }
                 style={line.type === 'heading' ? { fontSize: settings.headingFontSize } : undefined}
                 onChange={(v) => update(line.id, { text: v })}
+                onPaste={(v) => handlePaste(line.id, v)}
                 onEnter={() => insertAfter(line.id, emptyLine(isTask ? 'task' : 'text'))}
                 onBackspaceEmpty={() => {
                   // on backspace of empty: if line is task/heading, convert to text first; else remove

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Note, Reminder } from '@/lib/types'
 import {
   fetchNotes, fetchReminders, upsertNote, upsertReminder, deleteReminder,
-  deleteNoteForever as dbDeleteNote, emptyTrash as dbEmptyTrash,
+  deleteNoteForever as dbDeleteNote, emptyTrash as dbEmptyTrash, updateNotesPositions,
   createBlankNote, createBlankReminder
 } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
@@ -30,6 +30,7 @@ interface NotesCtx {
   removeReminder: (id: string) => void
   remindersFor: (noteId: string) => Reminder[]
   sortedRemindersFor: (noteId: string) => Reminder[]
+  reorderNotes: (activeId: string, overId: string, section: 'pinned' | 'others' | 'regular' | 'reminder') => void
 }
 
 const Ctx = createContext<NotesCtx>(null as any)
@@ -167,7 +168,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const addNote = useCallback(
     (overrides?: Partial<Note>) => {
       if (!user) return {} as Note
-      const note = createBlankNote(user.id, overrides)
+      const maxPos = notesRef.current.reduce((max, n) => Math.max(max, n.position ?? 0), -1)
+      const note = createBlankNote(user.id, { position: maxPos + 1, ...overrides })
       setNotes((prev) => [note, ...prev])
       upsertNote(note).catch((e) => console.error('addNote save', e))
       return note
@@ -225,6 +227,39 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [reminders]
   )
 
+  const reorderNotes = useCallback(
+    (activeId: string, overId: string, section: 'pinned' | 'others' | 'regular' | 'reminder') => {
+      if (activeId === overId) return
+      setNotes((prev) => {
+        let filterFn: (n: Note) => boolean
+        if (section === 'pinned') filterFn = (n) => n.pinned
+        else if (section === 'reminder') filterFn = (n) => !n.pinned && n.is_reminder_note
+        else if (section === 'regular') filterFn = (n) => !n.pinned && !n.is_reminder_note
+        else filterFn = (n) => !n.pinned
+
+        const sectionNotes = prev.filter(filterFn)
+        const otherNotes = prev.filter((n) => !filterFn(n))
+
+        const oldIndex = sectionNotes.findIndex((n) => n.id === activeId)
+        const newIndex = sectionNotes.findIndex((n) => n.id === overId)
+        if (oldIndex === -1 || newIndex === -1) return prev
+
+        const reordered = [...sectionNotes]
+        const [moved] = reordered.splice(oldIndex, 1)
+        reordered.splice(newIndex, 0, moved)
+
+        const reindexed = reordered.map((n, i) => ({ ...n, position: i }))
+        const updated = [...otherNotes, ...reindexed]
+
+        const updates = reindexed.map((n) => ({ id: n.id, position: n.position }))
+        updateNotesPositions(updates).catch((e) => console.error('reorderNotes save', e))
+
+        return updated
+      })
+    },
+    []
+  )
+
   // Auto-expire trashed notes older than 30 days (clean on load)
   useEffect(() => {
     if (!user) return
@@ -235,7 +270,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const value: NotesCtx = {
     notes, reminders, loading,
     addNote, updateNote, saveNoteNow, trashNote, restoreNote, deleteForever, emptyTrashAll,
-    addReminder, updateReminder, removeReminder, remindersFor, sortedRemindersFor
+    addReminder, updateReminder, removeReminder, remindersFor, sortedRemindersFor, reorderNotes
   }
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

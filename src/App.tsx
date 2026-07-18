@@ -4,6 +4,9 @@ import {
   Search, LayoutGrid, List, Sun, Moon, Archive, Trash2, NotebookPen,
   Bell, X, Pin, RotateCcw, FileX2, Plus, CheckSquare, Settings, Check
 } from 'lucide-react'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { useAuth } from '@/context/AuthContext'
 import { useNotes, TRASH_DAYS } from '@/context/NotesContext'
 import { useTheme } from '@/context/ThemeContext'
@@ -18,7 +21,7 @@ type View = 'notes' | 'archive' | 'trash' | 'reminders'
 
 export default function App() {
   const { user, loading, signOut } = useAuth()
-  const { notes, addNote, updateNote, trashNote, restoreNote, deleteForever, emptyTrashAll } = useNotes()
+  const { notes, addNote, updateNote, trashNote, restoreNote, deleteForever, emptyTrashAll, reorderNotes } = useNotes()
   const { theme, toggle } = useTheme()
   const [view, setView] = useState<View>('notes')
   const [layout, setLayout] = useState<'grid' | 'list'>(() =>
@@ -103,6 +106,16 @@ export default function App() {
     setSelected(new Set())
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
+  const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'regular' | 'reminder') => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    reorderNotes(active.id as string, over.id as string, section)
+  }
+
   const handleNoteOpen = (id: string) => {
     if (selectionMode) { toggleSelect(id); return }
     setOpenId(id)
@@ -167,33 +180,49 @@ export default function App() {
         {/* Notes view: Pinned → Reminders → Notes */}
         {view === 'notes' && pinned.length > 0 && (
           <Section title="Pinned">
-            <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
-              onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'pinned')}>
+              <SortableContext items={pinned.map((n) => n.id)} strategy={rectSortingStrategy}>
+                <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
+                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+              </SortableContext>
+            </DndContext>
           </Section>
         )}
 
         {view === 'notes' && reminderNotes.length > 0 && (
           <Section title="Reminders">
-            <NotesGrid notes={reminderNotes} layout={layout} selected={selected} selectionMode={selectionMode}
-              onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'reminder')}>
+              <SortableContext items={reminderNotes.map((n) => n.id)} strategy={rectSortingStrategy}>
+                <NotesGrid notes={reminderNotes} layout={layout} selected={selected} selectionMode={selectionMode}
+                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+              </SortableContext>
+            </DndContext>
           </Section>
         )}
 
         {view === 'notes' && regularNotes.length > 0 && (
           <Section title={pinned.length > 0 || reminderNotes.length > 0 ? 'Notes' : ''}>
-            <NotesGrid notes={regularNotes} layout={layout} selected={selected} selectionMode={selectionMode}
-              onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
-              onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'regular')}>
+              <SortableContext items={regularNotes.map((n) => n.id)} strategy={rectSortingStrategy}>
+                <NotesGrid notes={regularNotes} layout={layout} selected={selected} selectionMode={selectionMode}
+                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+              </SortableContext>
+            </DndContext>
           </Section>
         )}
 
         {/* Archive / Reminders tab: show all filtered */}
         {(view === 'archive' || view === 'reminders') && filtered.length > 0 && (
-          <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
-            onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
-            onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'regular')}>
+            <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
+              <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
+                onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+            </SortableContext>
+          </DndContext>
         )}
 
         {/* Trash view: show trashed notes */}

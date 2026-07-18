@@ -1,6 +1,8 @@
 import { useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Pin, Bell, Check } from 'lucide-react'
+import { Pin, Bell, Check, GripVertical } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Note } from '@/lib/types'
 import { useNotes } from '@/context/NotesContext'
 import { useTheme } from '@/context/ThemeContext'
@@ -28,6 +30,22 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
   const reminders = note.is_reminder_note ? sortedRemindersFor(note.id).slice(0, 3) : []
   const isList = view === 'list'
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: note.id, disabled: selectionMode })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
   const nonEmptyLines = note.lines.filter((l) => l.text.trim() !== '')
   const heading = note.title || nonEmptyLines.find((l) => l.type === 'heading')?.text || nonEmptyLines[0]?.text || 'New note'
   const previewLines = note.collapsed ? [] : nonEmptyLines.slice(0, note.title ? 6 : 7)
@@ -51,6 +69,7 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
 
   return (
     <motion.div
+      ref={setNodeRef}
       layout
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -62,8 +81,9 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
       onClick={handleClick}
       className={`group relative rounded-xl2 shadow-sm hover:shadow-md cursor-pointer transition-shadow select-none ${
         isList ? 'w-full' : ''
-      } ${selected ? 'ring-2 ring-amber-500' : ''}`}
+      } ${selected ? 'ring-2 ring-amber-500' : ''} ${isDragging ? 'shadow-xl ring-2 ring-amber-400' : ''}`}
       style={{
+        ...style,
         backgroundColor: noteBg(note.color, theme === 'dark'),
         border: `1px solid ${noteBorder(note.color, theme === 'dark')}`
       }}
@@ -72,11 +92,24 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
       {onPin && (
         <button
           onClick={(e) => { e.stopPropagation(); onPin() }}
-          className="absolute top-2 right-2 z-10 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 hover:bg-amber-500/20 text-muted hover:text-amber-500"
+          className="absolute top-2 right-8 z-10 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 hover:bg-amber-500/20 text-muted hover:text-amber-500"
           title={note.pinned ? 'Unpin' : 'Pin'}
         >
           <Pin size={14} fill={note.pinned ? 'currentColor' : 'none'} />
         </button>
+      )}
+
+      {/* drag handle */}
+      {!selectionMode && (
+        <div
+          {...attributes}
+          {...listeners}
+          className="absolute top-1.5 right-1.5 z-10 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-opacity cursor-grab active:cursor-grabbing touch-none"
+          style={{ opacity: isDragging ? 1 : undefined }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <GripVertical size={14} className="text-muted/60" />
+        </div>
       )}
 
       {/* selection checkbox overlay */}

@@ -36,6 +36,7 @@ export interface Note {
   show_checkboxes: boolean
   list_mode: boolean // when true, empty checkbox shown for text lines too
   image_url: string | null
+  position: number
   created_at: string
   updated_at: string
 }

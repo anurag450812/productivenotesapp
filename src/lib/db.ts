@@ -27,6 +27,7 @@ export function createBlankNote(userId: string, overrides: Partial<Note> = {}): 
     show_checkboxes: true,
     list_mode: false,
     image_url: null,
+    position: 0,
     created_at: now,
     updated_at: now,
     ...overrides
@@ -40,7 +41,7 @@ export async function fetchNotes(userId: string) {
     .from('notes')
     .select('*')
     .eq('user_id', userId)
-    .order('updated_at', { ascending: false })
+    .order('position', { ascending: true })
   if (error) throw error
   return (data ?? []) as Note[]
 }
@@ -60,6 +61,13 @@ export async function deleteNoteForever(id: string) {
 export async function emptyTrash(userId: string) {
   const { error } = await supabase.from('notes').delete().eq('user_id', userId).eq('trashed', true)
   if (error) throw error
+}
+
+export async function updateNotesPositions(updates: { id: string; position: number }[]) {
+  for (const u of updates) {
+    const { error } = await supabase.from('notes').update({ position: u.position }).eq('id', u.id)
+    if (error) throw error
+  }
 }
 
 // ---- Reminders ----

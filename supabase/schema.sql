@@ -19,6 +19,7 @@ create table if not exists public.notes (
   show_checkboxes   boolean not null default true,
   list_mode         boolean not null default false,
   image_url         text,
+  position          double precision not null default 0,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
