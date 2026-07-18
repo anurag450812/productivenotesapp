@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Pin, Archive, Trash2, Palette, EyeOff, Eye, RotateCcw, X,
-  Image as ImageIcon, Bell, BellOff, Minimize2, Copy, ChevronDown, ChevronUp
+  Image as ImageIcon, Bell, BellOff, Minimize2, Copy, ChevronDown, ChevronUp, PanelRight
 } from 'lucide-react'
 import type { Note } from '@/lib/types'
 import { useNotes } from '@/context/NotesContext'
@@ -18,9 +18,10 @@ interface Props {
   note: Note
   noteRect?: DOMRect | null
   onClose: () => void
+  onAddToSidebar?: () => void
 }
 
-export default function NoteEditor({ note, noteRect, onClose }: Props) {
+export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar }: Props) {
   const { updateNote, saveNoteNow, trashNote, addNote, deleteForever } = useNotes()
   const { theme } = useTheme()
   const { user } = useAuth()
@@ -123,26 +124,29 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   }
 
   return (
-    <motion.div
-      data-note-editor
-      className="fixed inset-0 z-50"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      onClick={() => close(true)}
-    >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-
+    <>
+      {/* backdrop — z-50 */}
       <motion.div
-        className="w-full flex flex-col max-h-[85vh] overflow-hidden"
-        style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1, zIndex: 1 }}
-        initial={initial}
-        animate={animate}
-        exit={exit}
-        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-        onClick={(e) => e.stopPropagation()}
-      >
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={() => close(true)}
+      />
+
+      {/* content card — z-[52] so sidebar at z-[51] stays visible */}
+      <div className="fixed inset-0 z-[52] pointer-events-none" onClick={() => close(true)}>
+        <motion.div
+          data-note-editor
+          className="pointer-events-auto w-full flex flex-col max-h-[85vh] overflow-hidden"
+          style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1 }}
+          initial={initial}
+          animate={animate}
+          exit={exit}
+          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* image */}
         {local.image_url && (
           <div className="relative">
@@ -237,6 +241,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
             <Minimize2 size={18} />
           </Tool>
           <Tool title="Color" onClick={() => setShowPalette((s) => !s)}><Palette size={18} /></Tool>
+          {onAddToSidebar && <Tool title="Pin to sidebar" onClick={() => { onAddToSidebar(); close() }}><PanelRight size={18} /></Tool>}
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImage(e.target.files[0])} />
 
           <div className="ml-auto flex items-center gap-1">
@@ -265,7 +270,8 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
           </motion.div>
         )}
       </motion.div>
-    </motion.div>
+      </div>
+    </>
   )
 }
 

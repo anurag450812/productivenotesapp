@@ -24,7 +24,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove }: Pro
   return (
     <>
       {/* backdrop on mobile */}
-      {open && <div className="fixed inset-0 z-[34] bg-black/30 sm:hidden" onClick={onClose} />}
+      {open && <div className="fixed inset-0 z-[50] bg-black/30 sm:hidden" onClick={onClose} />}
 
       <AnimatePresence>
         {open && (
@@ -34,7 +34,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove }: Pro
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-80 z-[35] bg-surface/95 backdrop-blur-xl border-l border-border shadow-2xl flex flex-col"
+            className="fixed right-0 top-0 bottom-0 w-full sm:w-80 z-[51] bg-surface border-l border-border shadow-2xl flex flex-col"
           >
             {/* header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">

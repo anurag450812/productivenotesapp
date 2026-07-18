@@ -64,8 +64,13 @@ export default function App() {
   // track pointer during drag for sidebar drop detection
   useEffect(() => {
     const onMove = (e: PointerEvent) => { dragPosRef.current = { x: e.clientX, y: e.clientY } }
+    const onUp = (e: PointerEvent) => { dragPosRef.current = { x: e.clientX, y: e.clientY } }
     document.addEventListener('pointermove', onMove, { passive: true })
-    return () => document.removeEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp, { passive: true })
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
   }, [])
 
   // keyboard delete
@@ -180,18 +185,17 @@ export default function App() {
     setSidebarOpen(true)
   }
   const removeFromSidebar = (id: string) => setSidebarNotes((prev) => prev.filter((n) => n !== id))
+  const bulkAddToSidebar = () => { selected.forEach(addToSidebar); clearSelection() }
 
   const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'others') => {
     const { active, over } = event
     setIsDragging(false)
-    if (!over) {
-      // dropped on empty space — check right edge for sidebar
-      if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < 80) {
-        addToSidebar(active.id as string)
-      }
+    // always check right edge first for sidebar drop
+    if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < 80) {
+      addToSidebar(active.id as string)
       return
     }
-    if (active.id === over.id) return
+    if (!over || active.id === over.id) return
     reorderNotes(active.id as string, over.id as string, section)
   }
 
@@ -224,6 +228,7 @@ export default function App() {
           onDeleteForever={() => bulk(deleteForever)}
           onPin={() => bulk((id) => updateNote(id, { pinned: true }))}
           onUncheck={() => bulk(uncheck)}
+          onSidebar={bulkAddToSidebar}
         />
       )}
 
@@ -306,7 +311,7 @@ export default function App() {
       {/* sidebar toggle tab (when closed) */}
       {!sidebarOpen && (
         <button onClick={() => setSidebarOpen(true)}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-surface border border-border border-r-0 rounded-l-lg px-1.5 py-3 text-muted hover:text-amber-500 transition-colors shadow-md hidden sm:block"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[51] bg-surface border border-border border-r-0 rounded-l-lg px-1.5 py-3 text-muted hover:text-amber-500 transition-colors shadow-md hidden sm:block"
           title="Open sidebar">
           <PanelRight size={16} />
         </button>
@@ -320,7 +325,7 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} />}
+        {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} onAddToSidebar={() => addToSidebar(openNote.id)} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -429,7 +434,7 @@ function SelectionBar(props: any) {
   const isTrash = props.view === 'trash'
   const actions = isTrash
     ? [['Restore', RotateCcw, props.onRestore], ['Delete forever', FileX2, props.onDeleteForever]]
-    : [['Pin', Pin, props.onPin], ['Uncheck all', CheckSquare, props.onUncheck], ['Archive', Archive, props.onArchive], ['Delete', Trash2, props.onTrash]]
+    : [['Sidebar', PanelRight, props.onSidebar], ['Pin', Pin, props.onPin], ['Uncheck all', CheckSquare, props.onUncheck], ['Archive', Archive, props.onArchive], ['Delete', Trash2, props.onTrash]]
   return (
     <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 inset-x-0 z-30 bg-surface border-b border-border shadow-md">
