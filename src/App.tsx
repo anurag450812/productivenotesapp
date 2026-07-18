@@ -254,11 +254,13 @@ export default function App() {
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} signOut={signOut} email={user.email}
         onSettings={() => setShowSettings(true)}
         selectMode={selectMode} onSelectMode={enterSelectMode} onSelectDone={clearSelection}
+        sidebarWidth={isDesktop ? sidebarWidth : 0}
       />
 
       {selected.size > 0 && (
         <SelectionBar
           count={selected.size} total={filtered.length} view={view}
+          sidebarWidth={isDesktop ? sidebarWidth : 0}
           onClear={clearSelection} onSelectAll={selectAll}
           onArchive={() => bulk((id) => updateNote(id, { archived: true }))}
           onTrash={confirmBulkTrash} onRestore={() => bulk(restoreNote)}
@@ -380,7 +382,7 @@ function TopBar(props: any) {
 
   return (
     <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-lg border-b border-border">
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2" style={{ paddingRight: Math.max(24, props.sidebarWidth || 0) }}>
         <div className="relative flex-1 max-w-xl">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input value={props.query} onChange={(e) => props.setQuery(e.target.value)} placeholder="Search notes"
@@ -421,7 +423,7 @@ function TopBar(props: any) {
           )}
         </div>
       </div>
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 flex gap-1 pb-2 overflow-x-auto scrollbar-none">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 flex gap-1 pb-2 overflow-x-auto scrollbar-none" style={{ paddingRight: Math.max(24, props.sidebarWidth || 0) }}>
         {tabs.map(({ key, label, Icon }) => (
           <button key={key} onClick={() => props.setView(key)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
@@ -467,7 +469,7 @@ function SelectionBar(props: any) {
   return (
     <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 inset-x-0 z-30 bg-surface border-b border-border shadow-md">
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2" style={{ paddingRight: Math.max(24, props.sidebarWidth || 0) }}>
         <button onClick={props.onClear} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10"><X size={19} /></button>
         <span className="text-sm font-medium">{props.count} selected</span>
         <button onClick={props.onSelectAll} className="text-sm text-amber-500 hover:text-amber-600 ml-2 font-medium">
