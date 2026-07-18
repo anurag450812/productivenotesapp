@@ -38,6 +38,22 @@ export default function App() {
   // marquee state (lifted to App for full-page coverage)
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null)
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const selectedRef = useRef(selected)
+  useEffect(() => { selectedRef.current = selected }, [selected])
+
+  // --- Keyboard Delete to trash selected notes ---
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedRef.current.size > 0 && !openId) {
+        e.preventDefault()
+        selectedRef.current.forEach(trashNote)
+        setSelected(new Set())
+        setSelectMode(false)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [openId, trashNote])
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
@@ -55,6 +71,10 @@ export default function App() {
       const target = e.target as HTMLElement
       if (target.closest('button') || target.closest('input') || target.closest('header') || target.closest('[data-note-editor]')) return
       if (target.closest('[data-note-card]')) return
+      if (selectedRef.current.size > 0) {
+        setSelected(new Set())
+        setSelectMode(false)
+      }
       marqueeStartRef.current = { x: e.clientX, y: e.clientY }
     }
 
@@ -174,7 +194,7 @@ export default function App() {
         selectMode={selectMode} onSelectMode={enterSelectMode} onSelectDone={clearSelection}
       />
 
-      {selectionMode && (
+      {selected.size > 0 && (
         <SelectionBar
           count={selected.size}
           total={filtered.length}

@@ -138,17 +138,6 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
         </div>
       )}
 
-      {/* selection checkbox overlay */}
-      {selectionMode && (
-        <div
-          className={`absolute top-2 left-2 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-            selected ? 'bg-amber-500 border-amber-500 text-white' : 'border-muted/60 bg-surface/80'
-          }`}
-        >
-          {selected && <Check size={12} strokeWidth={3} />}
-        </div>
-      )}
-
       <div className="p-3">
         {note.pinned && (
           <Pin size={14} className="text-amber-500 mb-1 opacity-0 sm:opacity-100" fill="currentColor" />
