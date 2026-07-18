@@ -50,7 +50,7 @@ export default function AuthScreen() {
           </div>
         )}
 
-        <form onSubmit={submit} className="space-y-3 bg-surface border border-border rounded-2xl p-5 shadow-sm">
+        <form onSubmit={submit} className="space-y-3 bg-surface border border-border rounded-2xl p-5 shadow-sm" autoComplete="on">
           <div className="flex bg-bg rounded-lg p-1">
             {(['signin', 'signup'] as const).map((m) => (
               <button
@@ -68,6 +68,9 @@ export default function AuthScreen() {
             <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="email"
+              name="email"
+              id="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -79,6 +82,9 @@ export default function AuthScreen() {
             <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="password"
+              name="password"
+              id="password"
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               required
               minLength={6}
               value={password}
