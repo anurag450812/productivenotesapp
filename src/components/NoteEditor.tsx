@@ -117,13 +117,16 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
     animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, height: editorH, scale: 1, borderRadius: 16, opacity: 1 }
     exit = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, height: editorH, scale: s, borderRadius: 12, opacity: 0 }
   } else {
-    initial = { y: 40, scale: 0.92, opacity: 0 }
-    animate = { y: 0, scale: 1, opacity: 1 }
-    exit = { y: 20, scale: 0.94, opacity: 0 }
+    const endTop = desktop ? (vh - editorH) / 2 : vh - editorH
+    const endLeft = (vw - editorW) / 2
+    initial = { position: 'fixed' as const, top: endTop + 40, left: endLeft, width: editorW, scale: 0.92, opacity: 0 }
+    animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, scale: 1, opacity: 1 }
+    exit = { position: 'fixed' as const, top: endTop + 20, left: endLeft, width: editorW, scale: 0.94, opacity: 0 }
   }
 
   return (
     <motion.div
+      data-note-editor
       className="fixed inset-0 z-50"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Pin, Bell, Check, GripVertical } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
@@ -27,6 +27,8 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
   const { settings } = useSettings()
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pressed = useRef(false)
+  const hasDragged = useRef(false)
+  const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const reminders = note.is_reminder_note ? sortedRemindersFor(note.id).slice(0, 3) : []
   const isList = view === 'list'
 
@@ -61,8 +63,32 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
     if (pressTimer.current) clearTimeout(pressTimer.current)
   }
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    hasDragged.current = false
+    pointerStart.current = { x: e.clientX, y: e.clientY }
+    listeners?.onPointerDown?.(e as any)
+  }
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!pointerStart.current) return
+      const dx = Math.abs(e.clientX - pointerStart.current.x)
+      const dy = Math.abs(e.clientY - pointerStart.current.y)
+      if (dx > 5 || dy > 5) hasDragged.current = true
+    }
+    const onUp = () => { pointerStart.current = null }
+    document.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('pointerup', onUp, { passive: true })
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+  }, [])
+
   const handleClick = (e: React.MouseEvent) => {
+    if (hasDragged.current) { hasDragged.current = false; return }
     if (pressed.current) { pressed.current = false; return }
+    if (e.ctrlKey || e.metaKey) { onToggleSelect(); return }
     if (selectionMode) { onToggleSelect(); return }
     onOpen((e.currentTarget as HTMLElement).getBoundingClientRect())
   }
@@ -78,8 +104,10 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
       onTouchStart={startPress}
       onTouchEnd={endPress}
       onTouchMove={endPress}
+      onPointerDown={handlePointerDown}
+      {...attributes}
       onClick={handleClick}
-      className={`group relative rounded-xl2 shadow-sm hover:shadow-md cursor-pointer transition-shadow select-none ${
+      className={`group relative rounded-xl2 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow select-none touch-none ${
         isList ? 'w-full' : ''
       } ${selected ? 'ring-2 ring-amber-500' : ''} ${isDragging ? 'shadow-xl ring-2 ring-amber-400' : ''}`}
       style={{
@@ -91,6 +119,7 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
       {/* hover pin button - web only */}
       {onPin && (
         <button
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onPin() }}
           className="absolute top-2 right-8 z-10 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 hover:bg-amber-500/20 text-muted hover:text-amber-500"
           title={note.pinned ? 'Unpin' : 'Pin'}
@@ -99,14 +128,11 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
         </button>
       )}
 
-      {/* drag handle */}
+      {/* drag handle indicator */}
       {!selectionMode && (
         <div
-          {...attributes}
-          {...listeners}
-          className="absolute top-1.5 right-1.5 z-10 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-opacity cursor-grab active:cursor-grabbing touch-none"
+          className="absolute top-1.5 right-1.5 z-10 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/10 transition-opacity pointer-events-none"
           style={{ opacity: isDragging ? 1 : undefined }}
-          onPointerDown={(e) => { listeners?.onPointerDown?.(e as any); e.stopPropagation() }}
         >
           <GripVertical size={14} className="text-muted/60" />
         </div>

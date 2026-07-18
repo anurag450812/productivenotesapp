@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Search, LayoutGrid, List, Sun, Moon, Archive, Trash2, NotebookPen,
-  Bell, X, Pin, RotateCcw, FileX2, Plus, CheckSquare, Settings, Check
+  Bell, X, Pin, RotateCcw, FileX2, Plus, CheckSquare, Settings, Check, Monitor
 } from 'lucide-react'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -22,7 +22,7 @@ type View = 'notes' | 'archive' | 'trash' | 'reminders'
 export default function App() {
   const { user, loading, signOut } = useAuth()
   const { notes, addNote, updateNote, trashNote, restoreNote, deleteForever, emptyTrashAll, reorderNotes } = useNotes()
-  const { theme, toggle } = useTheme()
+  const { theme, themeMode, toggle } = useTheme()
   const [view, setView] = useState<View>('notes')
   const [layout, setLayout] = useState<'grid' | 'list'>(() =>
     (localStorage.getItem('layout') as 'grid' | 'list') || 'grid'
@@ -35,6 +35,10 @@ export default function App() {
   const [selectMode, setSelectMode] = useState(false)
   const [noteRect, setNoteRect] = useState<DOMRect | null>(null)
 
+  // marquee state (lifted to App for full-page coverage)
+  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
   const isTouch = Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches
@@ -43,6 +47,45 @@ export default function App() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+
+  // --- Document-level marquee (drag-select from anywhere on page) ---
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches) return
+      const target = e.target as HTMLElement
+      if (target.closest('button') || target.closest('input') || target.closest('header') || target.closest('[data-note-editor]')) return
+      if (target.closest('[data-note-card]')) return
+      marqueeStartRef.current = { x: e.clientX, y: e.clientY }
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!marqueeStartRef.current) return
+      const s = marqueeStartRef.current
+      const x = Math.min(s.x, e.clientX), y = Math.min(s.y, e.clientY)
+      const w = Math.abs(e.clientX - s.x), h = Math.abs(e.clientY - s.y)
+      if (w < 8 && h < 8) { setMarquee(null); return }
+      setMarquee({ x, y, w, h })
+      setSelectMode(true)
+      const rect = { left: x, top: y, right: x + w, bottom: y + h }
+      const next = new Set<string>()
+      document.querySelectorAll<HTMLElement>('[data-note-card]').forEach((el) => {
+        const r = el.getBoundingClientRect()
+        if (r.left < rect.right && r.right > rect.left && r.top < rect.bottom && r.bottom > rect.top) next.add(el.dataset.noteCard!)
+      })
+      setSelected(next)
+    }
+
+    const onPointerUp = () => { marqueeStartRef.current = null; setMarquee(null) }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('pointermove', onPointerMove)
+    document.addEventListener('pointerup', onPointerUp)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('pointermove', onPointerMove)
+      document.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     let list = notes
@@ -90,7 +133,6 @@ export default function App() {
     })
 
   const clearSelection = () => { setSelected(new Set()); setSelectMode(false) }
-  const setSelection = (s: Set<string>) => setSelected(s)
 
   const selectAll = () => setSelected(new Set(filtered.map((n) => n.id)))
 
@@ -125,7 +167,7 @@ export default function App() {
     <div className="min-h-screen bg-bg text-text">
       <TopBar
         query={query} setQuery={setQuery} layout={layout} setLayout={setLayout}
-        theme={theme} toggleTheme={toggle} view={view}
+        themeMode={themeMode} toggleTheme={toggle} view={view}
         setView={(v: View) => { setView(v); setMenuOpen(false); setSelectMode(false); setSelected(new Set()) }}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} signOut={signOut} email={user.email}
         onSettings={() => setShowSettings(true)}
@@ -149,8 +191,8 @@ export default function App() {
       )}
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 pb-28 pt-4 safe-bottom">
-        {/* Take a note bar */}
-        {view === 'notes' && !selectionMode && (
+        {/* Take a note bar — always visible in notes view */}
+        {view === 'notes' && (
           <div
             className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
             onClick={() => startQuick(false)}
@@ -183,7 +225,7 @@ export default function App() {
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'pinned')}>
               <SortableContext items={pinned.map((n) => n.id)} strategy={rectSortingStrategy}>
                 <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
-                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
                   onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
               </SortableContext>
             </DndContext>
@@ -195,7 +237,7 @@ export default function App() {
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'others')}>
               <SortableContext items={unpinned.map((n) => n.id)} strategy={rectSortingStrategy}>
                 <NotesGrid notes={unpinned} layout={layout} selected={selected} selectionMode={selectionMode}
-                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
                   onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
               </SortableContext>
             </DndContext>
@@ -207,7 +249,7 @@ export default function App() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'others')}>
             <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
               <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
-                onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+                onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
                 onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
             </SortableContext>
           </DndContext>
@@ -216,17 +258,20 @@ export default function App() {
         {/* Trash view: show trashed notes */}
         {view === 'trash' && filtered.length > 0 && (
           <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
-            onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
+            onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
             onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
         )}
       </main>
 
-      {isTouch && view === 'notes' && !selectionMode && (
+      {isTouch && view === 'notes' && (
         <button onClick={() => startQuick(false)}
           className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/40 flex items-center justify-center active:scale-90 transition-transform">
           <Plus size={26} />
         </button>
       )}
+
+      {/* Selection marquee */}
+      {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
 
       <AnimatePresence>
         {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} />}
@@ -260,8 +305,8 @@ function TopBar(props: any) {
           className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Toggle view">
           {props.layout === 'grid' ? <List size={19} /> : <LayoutGrid size={19} />}
         </button>
-        <button onClick={props.toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Toggle theme">
-          {props.theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+        <button onClick={props.toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title={`Theme: ${props.themeMode}`}>
+          {props.themeMode === 'system' ? <Monitor size={19} /> : props.themeMode === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
         </button>
         {props.selectMode ? (
           <button onClick={props.onSelectDone}
@@ -328,37 +373,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function NotesGrid(props: any) {
-  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, setSelection, onLongPress, isTouch, onUpdateNote } = props
-  const containerRef = useRef<HTMLDivElement>(null)
-  const startRef = useRef<{ x: number; y: number } | null>(null)
-  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    if (isTouch && !selectionMode) return // allow drag-select in selection mode on touch
-    if ((e.target as HTMLElement).closest('[data-note-card]')) return
-    startRef.current = { x: e.clientX, y: e.clientY }
-  }
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!startRef.current) return
-    const s = startRef.current
-    const x = Math.min(s.x, e.clientX), y = Math.min(s.y, e.clientY)
-    const w = Math.abs(e.clientX - s.x), h = Math.abs(e.clientY - s.y)
-    if (w < 8 && h < 8) { setMarquee(null); return }
-    setMarquee({ x, y, w, h })
-    const rect = { left: x, top: y, right: x + w, bottom: y + h }
-    const next = new Set<string>()
-    containerRef.current?.querySelectorAll<HTMLElement>('[data-note-card]').forEach((el) => {
-      const r = el.getBoundingClientRect()
-      if (r.left < rect.right && r.right > rect.left && r.top < rect.bottom && r.bottom > rect.top) next.add(el.dataset.noteCard!)
-    })
-    setSelection(next)
-  }
-  const endDrag = () => { startRef.current = null; setMarquee(null) }
+  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote } = props
 
   return (
-    <div ref={containerRef}
-      className={layout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}
-      onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={endDrag} onMouseLeave={endDrag}>
+    <div className={layout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}>
       {notes.map((n: Note) => (
         <div key={n.id} data-note-card={n.id} className="break-inside-avoid mb-3">
           <NoteCard note={n} selected={selected.has(n.id)} selectionMode={selectionMode} view={layout}
@@ -366,7 +384,6 @@ function NotesGrid(props: any) {
             onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} />
         </div>
       ))}
-      {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
     </div>
   )
 }
