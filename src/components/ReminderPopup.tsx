@@ -31,8 +31,12 @@ export default function ReminderPopup() {
 
   if (dueReminders.length === 0) return null
 
+  const isMobile = window.innerWidth < 640
+
   return (
-    <div className="fixed left-4 bottom-4 z-[60] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+    <div className={`fixed z-[60] flex flex-col gap-2 pointer-events-none ${
+      isMobile ? 'left-3 bottom-3 max-w-[calc(100vw-24px)] w-auto' : 'left-4 bottom-4 max-w-sm w-full'
+    }`}>
       <AnimatePresence>
         {dueReminders.map((r) => (
           <ReminderCard
@@ -53,6 +57,7 @@ export default function ReminderPopup() {
               setHiddenIds((prev) => new Set([...prev, r.id]))
             }}
             onConfirmNo={() => setConfirmId(null)}
+            isMobile={isMobile}
           />
         ))}
       </AnimatePresence>
@@ -62,7 +67,7 @@ export default function ReminderPopup() {
 
 function ReminderCard({
   r, note, onSnooze, onComplete, onHide,
-  isConfirming, onConfirmYes, onConfirmNo
+  isConfirming, onConfirmYes, onConfirmNo, isMobile
 }: {
   r: Reminder
   note: any
@@ -72,8 +77,51 @@ function ReminderCard({
   isConfirming: boolean
   onConfirmYes: () => void
   onConfirmNo: () => void
+  isMobile: boolean
 }) {
   const tasks = note?.lines?.filter((l: any) => l.type === 'task') || []
+
+  if (isMobile) {
+    // MOBILE: compact single-row banner
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 40, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 40, scale: 0.95 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        className="pointer-events-auto"
+      >
+        <div className="relative bg-red-50 dark:bg-red-950/80 border border-red-300 dark:border-red-700 rounded-xl shadow-lg shadow-red-500/20 overflow-hidden">
+          {isConfirming ? (
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />
+              <span className="text-xs text-red-700 dark:text-red-300 flex-1 truncate">Done?</span>
+              <button onClick={onConfirmNo} className="text-xs px-2.5 py-1.5 rounded min-h-[40px] text-muted hover:bg-white/50 dark:hover:bg-black/20">No</button>
+              <button onClick={onConfirmYes} className="text-xs px-2.5 py-1.5 rounded bg-red-500 text-white hover:bg-red-600 min-h-[40px]">Yes</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <div className="w-7 h-7 rounded-lg bg-red-500 flex items-center justify-center shrink-0">
+                <Bell size={13} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-red-700 dark:text-red-300 truncate">{r.title || 'Reminder'}</p>
+                <p className="text-[10px] text-red-600/70 dark:text-red-400/70 truncate">{relativeLabel(r)}</p>
+              </div>
+              <button onClick={onSnooze} className="px-2 py-1.5 rounded-lg bg-amber-500 text-white text-[10px] font-semibold min-h-[36px] shrink-0">Snooze</button>
+              <button onClick={onComplete} className="px-2 py-1.5 rounded-lg bg-green-500 text-white text-[10px] font-semibold min-h-[36px] shrink-0">Done</button>
+              <button onClick={onHide} className="p-1.5 rounded-lg text-muted min-w-[36px] min-h-[36px] flex items-center justify-center shrink-0" title="Hide">
+                <EyeOff size={13} />
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    )
+  }
+
+  // DESKTOP: original full card
 
   return (
     <motion.div

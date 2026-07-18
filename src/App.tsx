@@ -38,6 +38,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [noteRect, setNoteRect] = useState<DOMRect | null>(null)
+  const scrollPosRef = useRef(0)
 
   // marquee
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -70,10 +71,14 @@ export default function App() {
     return () => clearTimeout(t)
   }, [sidebarWidth])
 
-  // auto-open sidebar when note editor opens (if sidebar has notes)
+  const isDesktop = useState(() => window.matchMedia('(min-width: 640px)').matches)[0]
+  const isTouch = useState(() => Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches)[0]
+  const selectionMode = selectMode || selected.size > 0
+
+  // auto-open sidebar when note editor opens (if sidebar has notes) — desktop only
   useEffect(() => {
-    if (openId && sidebarNotes.length > 0) setSidebarOpen(true)
-  }, [openId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (openId && sidebarNotes.length > 0 && isDesktop) setSidebarOpen(true)
+  }, [openId, isDesktop]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // track pointer during drag for sidebar drop detection
   useEffect(() => {
@@ -113,7 +118,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (openId) { setNoteRect(null); setOpenId(null) }
-        else if (sidebarOpen) setSidebarOpen(false)
+        else if (isDesktop && sidebarOpen) setSidebarOpen(false)
         else if (menuOpen) setMenuOpen(false)
         else if (showSettings) setShowSettings(false)
         else if (selected.size > 0 || selectMode) { setSelected(new Set()); setSelectMode(false) }
@@ -121,11 +126,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [openId, sidebarOpen, menuOpen, showSettings, selected.size, selectMode])
-
-  const isDesktop = useState(() => window.matchMedia('(min-width: 640px)').matches)[0]
-  const isTouch = useState(() => Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches)[0]
-  const selectionMode = selectMode || selected.size > 0
+  }, [openId, sidebarOpen, menuOpen, showSettings, selected.size, selectMode, isDesktop])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -263,12 +264,13 @@ export default function App() {
   const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'others') => {
     const { active, over } = event
     setIsDragging(false)
-    // always check right edge first for sidebar drop
-    // when sidebar is open, the drop zone covers the full sidebar width (320px)
-    const dropThreshold = sidebarOpen ? 320 : 80
-    if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < dropThreshold) {
-      addToSidebar(active.id as string)
-      return
+    // sidebar drop only on desktop
+    if (isDesktop) {
+      const dropThreshold = sidebarOpen ? 320 : 80
+      if (dragPosRef.current && window.innerWidth - dragPosRef.current.x < dropThreshold) {
+        addToSidebar(active.id as string)
+        return
+      }
     }
     if (!over || active.id === over.id) return
     reorderNotes(active.id as string, over.id as string, section)
@@ -276,6 +278,7 @@ export default function App() {
 
   const handleNoteOpen = (id: string, rect?: DOMRect) => {
     if (selectionMode) { toggleSelect(id); return }
+    if (!isDesktop) scrollPosRef.current = window.scrollY
     setNoteRect(rect || null)
     setOpenId(id)
   }
@@ -294,6 +297,7 @@ export default function App() {
         sidebarWidth={isDesktop ? sidebarWidth : 0}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
         hasSidebarNotes={sidebarNotes.length > 0}
+        isDesktop={isDesktop}
       />
 
       {selected.size > 0 && (
@@ -307,6 +311,7 @@ export default function App() {
           onPin={() => bulk((id) => updateNote(id, { pinned: true }))}
           onUncheck={() => bulk(uncheck)}
           onSidebar={bulkAddToSidebar}
+          isDesktop={isDesktop}
         />
       )}
 
@@ -337,7 +342,7 @@ export default function App() {
               <SortableContext items={pinned.map((n) => n.id)} strategy={rectSortingStrategy}>
                 <NotesGrid notes={pinned} layout={layout} selected={selected} selectionMode={selectionMode}
                   onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
-                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} isDesktop={isDesktop} />
               </SortableContext>
             </DndContext>
           </Section>
@@ -349,7 +354,7 @@ export default function App() {
               <SortableContext items={unpinned.map((n) => n.id)} strategy={rectSortingStrategy}>
                 <NotesGrid notes={unpinned} layout={layout} selected={selected} selectionMode={selectionMode}
                   onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
-                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} isDesktop={isDesktop} />
               </SortableContext>
             </DndContext>
           </Section>
@@ -360,7 +365,7 @@ export default function App() {
             <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
               <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
                 onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
-                onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+                onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} isDesktop={isDesktop} />
             </SortableContext>
           </DndContext>
         )}
@@ -372,34 +377,36 @@ export default function App() {
         {view === 'trash' && filtered.length > 0 && (
           <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
             onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
-            onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+            onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} isDesktop={isDesktop} />
         )}
       </main>
 
       {isTouch && view === 'notes' && (
         <button onClick={() => startQuick(false)}
-          className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/40 flex items-center justify-center active:scale-90 transition-transform">
+          className="fixed bottom-6 right-5 z-30 w-14 h-14 rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-500/40 flex items-center justify-center active:scale-90 transition-transform safe-bottom">
           <Plus size={26} />
         </button>
       )}
 
-      {/* drag-to-sidebar drop zone indicator */}
-      {isDragging && (
+      {/* drag-to-sidebar drop zone indicator — desktop only */}
+      {isDesktop && isDragging && (
         <div className="fixed right-80 top-0 bottom-0 w-20 z-[42] pointer-events-none flex items-center justify-center">
           <div className="h-2/3 w-1 rounded-full bg-amber-500/30 animate-pulse" />
         </div>
       )}
 
+      {isDesktop && (
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} width={sidebarWidth}
-        noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} onReorder={reorderSidebar}
-        isDragging={isDragging} onToggleTask={toggleSidebarTask} onWidthChange={setSidebarWidth} />
+          noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} onReorder={reorderSidebar}
+          isDragging={isDragging} onToggleTask={toggleSidebarTask} onWidthChange={setSidebarWidth} />
+      )}
 
       <AnimatePresence>
         {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
       </AnimatePresence>
 
       <AnimatePresence>
-        {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} onAddToSidebar={() => addToSidebar(openNote.id)} sidebarWidth={isDesktop ? sidebarWidth : 0} />}
+        {openNote && <NoteEditor note={openNote} noteRect={isDesktop ? noteRect : null} onClose={() => { setNoteRect(null); setOpenId(null); if (!isDesktop) requestAnimationFrame(() => window.scrollTo(0, scrollPosRef.current)) }} onAddToSidebar={isDesktop ? () => addToSidebar(openNote.id) : undefined} sidebarWidth={isDesktop ? sidebarWidth : 0} />}
       </AnimatePresence>
 
       <ReminderPopup />
@@ -427,16 +434,18 @@ function TopBar(props: any) {
           <input value={props.query} onChange={(e) => props.setQuery(e.target.value)} placeholder="Search notes"
             className="w-full bg-surface border border-border rounded-full pl-9 pr-3 py-2.5 text-sm outline-none focus:border-amber-500 transition-colors" />
         </div>
-        {props.hasSidebarNotes && (
+        {props.hasSidebarNotes && props.isDesktop && (
           <button onClick={props.onToggleSidebar}
             className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="Sidebar">
             <PanelRight size={19} />
           </button>
         )}
-        <button onClick={() => props.setLayout(props.layout === 'grid' ? 'list' : 'grid')}
-          className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="Toggle view">
-          {props.layout === 'grid' ? <List size={19} /> : <LayoutGrid size={19} />}
-        </button>
+        {props.isDesktop && (
+          <button onClick={() => props.setLayout(props.layout === 'grid' ? 'list' : 'grid')}
+            className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="Toggle view">
+            {props.layout === 'grid' ? <List size={19} /> : <LayoutGrid size={19} />}
+          </button>
+        )}
         <button onClick={props.toggleTheme} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title={`Theme: ${props.themeMode}`}>
           {props.themeMode === 'system' ? <Monitor size={19} /> : props.themeMode === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
         </button>
@@ -492,9 +501,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function NotesGrid(props: any) {
-  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote } = props
+  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote, isDesktop } = props
+  // force list layout on mobile
+  const effectiveLayout = isDesktop ? layout : 'list'
   return (
-    <div className={layout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}>
+    <div className={effectiveLayout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}>
       {notes.map((n: Note) => (
         <div key={n.id} data-note-card={n.id} className="break-inside-avoid mb-3">
           <NoteCard note={n} selected={selected.has(n.id)} selectionMode={selectionMode} view={layout}
@@ -510,7 +521,10 @@ function SelectionBar(props: any) {
   const isTrash = props.view === 'trash'
   const actions = isTrash
     ? [['Restore', RotateCcw, props.onRestore], ['Delete forever', FileX2, props.onDeleteForever]]
-    : [['Sidebar', PanelRight, props.onSidebar], ['Pin', Pin, props.onPin], ['Uncheck all', CheckSquare, props.onUncheck], ['Archive', Archive, props.onArchive], ['Delete', Trash2, props.onTrash]]
+    : [
+        ...(props.isDesktop ? [['Sidebar', PanelRight, props.onSidebar]] : []),
+        ['Pin', Pin, props.onPin], ['Uncheck all', CheckSquare, props.onUncheck], ['Archive', Archive, props.onArchive], ['Delete', Trash2, props.onTrash]
+      ]
   return (
     <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 inset-x-0 z-30 bg-surface border-b border-border shadow-md">

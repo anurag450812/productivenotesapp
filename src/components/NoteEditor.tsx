@@ -92,7 +92,6 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
     })
   }
 
-  // Split lines: text/headings first, then unchecked tasks, then checked tasks
   if (!local?.lines) return null
   const hasTasks = local.lines.some((l) => l.type === 'task')
   const textLines = local.lines.filter((l) => l.type !== 'task')
@@ -103,7 +102,143 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
   const vw = typeof window !== 'undefined' ? window.innerWidth : 640
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   const desktop = vw >= 640
-  const editorW = desktop ? Math.min(640, vw - 32) : vw - 16
+
+  if (!desktop) {
+    // MOBILE: full-screen, no animation, no sidebar offset
+    return (
+      <>
+        <div
+          data-note-editor
+          className="fixed inset-0 z-[52] bg-bg flex flex-col overflow-hidden"
+          style={{ top: 0, height: '100dvh' }}
+        >
+          {/* image */}
+          {local.image_url && (
+            <div className="relative shrink-0">
+              <img src={local.image_url} alt="" className="w-full max-h-48 object-cover" />
+              <button
+                onClick={() => commit({ image_url: null })}
+                className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              ><X size={14} /></button>
+            </div>
+          )}
+
+          {/* top row: back + pin */}
+          <div className="flex items-center px-3 pt-3 pb-1 shrink-0 safe-top">
+            <button onClick={() => close(true)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center mr-1">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <input
+              value={local.title}
+              onChange={(e) => commit({ title: e.target.value })}
+              placeholder="Title"
+              className="line-input font-semibold flex-1"
+              style={{ fontSize: settings.headingFontSize }}
+            />
+            <button
+              onClick={() => commit({ pinned: !local.pinned })}
+              className={`p-2 rounded-full transition-colors ${local.pinned ? 'text-amber-500' : 'text-muted/60 hover:text-amber-500'}`}
+            ><Pin size={18} fill={local.pinned ? 'currentColor' : 'none'} /></button>
+          </div>
+
+          {/* body */}
+          <div className="px-3 py-2 flex-1 min-h-0 overflow-y-auto">
+            <LineEditor
+              lines={activeLines}
+              showCheckboxes={local.show_checkboxes}
+              onChange={(newActive) => {
+                commit({ lines: [...newActive, ...doneLines] })
+              }}
+            />
+
+            {hasTasks && doneLines.length > 0 && (
+              <div className="my-2">
+                <button
+                  onClick={() => setCollapseChecked((c) => !c)}
+                  className="w-full flex items-center gap-2 py-1.5 text-sm text-muted hover:text-text transition-colors"
+                >
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="flex items-center gap-1 text-xs font-medium whitespace-nowrap">
+                    {collapseChecked ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                    ✓ {doneLines.length} completed
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </button>
+              </div>
+            )}
+
+            <AnimatePresence initial={false}>
+              {hasTasks && doneLines.length > 0 && !collapseChecked && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <LineEditor
+                    lines={doneLines}
+                    showCheckboxes={local.show_checkboxes}
+                    onChange={(newDone) => commit({ lines: [...activeLines, ...newDone] })}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {local.is_reminder_note && <div className="mt-3"><RemindersList noteId={note.id} /></div>}
+          </div>
+
+          {/* toolbar */}
+          <div className="flex items-center gap-1 px-3 py-2 border-t border-black/5 dark:border-white/5 flex-wrap flex-shrink-0 safe-bottom">
+            <Tool title={local.archived ? 'Unarchive' : 'Archive'} onClick={() => { commit({ archived: !local.archived }); close() }}>
+              <Archive size={18} />
+            </Tool>
+            <Tool title="Move to trash" onClick={() => { if (note.pinned && !window.confirm('This note is pinned. Move it to trash?')) return; trashNote(note.id); dirtyRef.current = false; onClose() }}><Trash2 size={18} /></Tool>
+            <Tool title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon size={18} /></Tool>
+            <Tool title={local.is_reminder_note ? 'Disable reminders' : 'Enable reminders'} onClick={() => commit({ is_reminder_note: !local.is_reminder_note })}>
+              {local.is_reminder_note ? <Bell size={18} className="text-amber-500" /> : <BellOff size={18} />}
+            </Tool>
+            <Tool title={local.show_checkboxes ? 'Hide checkboxes' : 'Show checkboxes'} onClick={() => commit({ show_checkboxes: !local.show_checkboxes })}>
+              {local.show_checkboxes ? <Eye size={18} /> : <EyeOff size={18} />}
+            </Tool>
+            <Tool title="Toggle check all" onClick={toggleCheckAll}><RotateCcw size={18} /></Tool>
+            <Tool title="Duplicate note" onClick={duplicate}><Copy size={18} /></Tool>
+            <Tool title={local.collapsed ? 'Expand default' : 'Collapse by default'} onClick={() => commit({ collapsed: !local.collapsed })}>
+              <Minimize2 size={18} />
+            </Tool>
+            <Tool title="Color" onClick={() => setShowPalette((s) => !s)}><Palette size={18} /></Tool>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImage(e.target.files[0])} />
+
+            <div className="ml-auto flex items-center gap-1">
+              <button onClick={() => close()} className="text-sm font-medium px-4 py-2.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors min-h-[44px]">
+                Done
+              </button>
+            </div>
+          </div>
+
+          {showPalette && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              className="px-4 pb-3 flex flex-wrap gap-2 shrink-0"
+            >
+              {COLOR_ORDER.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => { commit({ color: c }); setShowPalette(false) }}
+                  className="w-9 h-9 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{ backgroundColor: theme === 'dark' ? NOTE_COLORS[c].dark : NOTE_COLORS[c].light, borderColor: local.color === c ? '#f59e0b' : 'transparent' }}
+                  title={NOTE_COLORS[c].name}
+                />
+              ))}
+            </motion.div>
+          )}
+        </div>
+      </>
+    )
+  }
+
+  // DESKTOP: original animated layout with sidebar offset
+  const editorW = Math.min(640, vw - 32)
 
   let initial: Record<string, any>
   let animate: Record<string, any>
