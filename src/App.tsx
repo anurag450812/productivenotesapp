@@ -61,8 +61,6 @@ export default function App() {
 
   const pinned = useMemo(() => filtered.filter((n) => n.pinned), [filtered])
   const unpinned = useMemo(() => filtered.filter((n) => !n.pinned), [filtered])
-  const reminderNotes = useMemo(() => unpinned.filter((n) => n.is_reminder_note), [unpinned])
-  const regularNotes = useMemo(() => unpinned.filter((n) => !n.is_reminder_note), [unpinned])
   const openNote = useMemo(() => notes.find((n) => n.id === openId) || null, [notes, openId])
 
   const trashCount = useMemo(() => notes.filter((n) => n.trashed).length, [notes])
@@ -110,7 +108,7 @@ export default function App() {
     setSelected(new Set())
   }
 
-  const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'regular' | 'reminder') => {
+  const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'others') => {
     const { active, over } = event
     if (!over || active.id === over.id) return
     reorderNotes(active.id as string, over.id as string, section)
@@ -177,7 +175,7 @@ export default function App() {
 
         {filtered.length === 0 && <EmptyState view={view} />}
 
-        {/* Notes view: Pinned → Reminders → Notes */}
+        {/* Notes view: Pinned → Others (all unpinned together) */}
         {view === 'notes' && pinned.length > 0 && (
           <Section title="Pinned">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'pinned')}>
@@ -190,23 +188,11 @@ export default function App() {
           </Section>
         )}
 
-        {view === 'notes' && reminderNotes.length > 0 && (
-          <Section title="Reminders">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'reminder')}>
-              <SortableContext items={reminderNotes.map((n) => n.id)} strategy={rectSortingStrategy}>
-                <NotesGrid notes={reminderNotes} layout={layout} selected={selected} selectionMode={selectionMode}
-                  onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
-                  onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
-              </SortableContext>
-            </DndContext>
-          </Section>
-        )}
-
-        {view === 'notes' && regularNotes.length > 0 && (
-          <Section title={pinned.length > 0 || reminderNotes.length > 0 ? 'Notes' : ''}>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'regular')}>
-              <SortableContext items={regularNotes.map((n) => n.id)} strategy={rectSortingStrategy}>
-                <NotesGrid notes={regularNotes} layout={layout} selected={selected} selectionMode={selectionMode}
+        {view === 'notes' && unpinned.length > 0 && (
+          <Section title={pinned.length > 0 ? 'Notes' : ''}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'others')}>
+              <SortableContext items={unpinned.map((n) => n.id)} strategy={rectSortingStrategy}>
+                <NotesGrid notes={unpinned} layout={layout} selected={selected} selectionMode={selectionMode}
                   onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}
                   onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
               </SortableContext>
@@ -216,7 +202,7 @@ export default function App() {
 
         {/* Archive / Reminders tab: show all filtered */}
         {(view === 'archive' || view === 'reminders') && filtered.length > 0 && (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'regular')}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'others')}>
             <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
               <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
                 onOpen={handleNoteOpen} onToggleSelect={toggleSelect} setSelection={setSelection}

@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { nanoid } from 'nanoid'
 import { Check, Square, Heading1, Type, GripVertical } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { NoteLine } from '@/lib/types'
 import { emptyLine } from '@/lib/db'
 import { useSettings } from '@/context/SettingsContext'
@@ -13,9 +16,8 @@ interface Props {
   onChange: (lines: NoteLine[]) => void
 }
 
-// Auto-grow input
 function AutoInput({
-  value, onChange, onEnter, onBackspaceEmpty, onPaste, placeholder, className, ariaLabel, style
+  value, onChange, onEnter, onBackspaceEmpty, onPaste, placeholder, className, style, readOnly
 }: {
   value: string
   onChange: (v: string) => void
@@ -24,8 +26,8 @@ function AutoInput({
   onPaste?: (text: string) => void
   placeholder?: string
   className?: string
-  ariaLabel?: string
   style?: React.CSSProperties
+  readOnly?: boolean
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
@@ -39,13 +41,14 @@ function AutoInput({
     <textarea
       ref={ref}
       rows={1}
-      aria-label={ariaLabel}
       className={`line-input ${className ?? ''}`}
       placeholder={placeholder}
       value={value}
       style={style}
+      readOnly={readOnly}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
+        if (readOnly) return
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault()
           onEnter()
@@ -55,6 +58,7 @@ function AutoInput({
         }
       }}
       onPaste={(e) => {
+        if (readOnly) return
         const text = e.clipboardData.getData('text')
         if (text.includes('\n') || text.includes('\r')) {
           e.preventDefault()
@@ -65,8 +69,103 @@ function AutoInput({
   )
 }
 
+function SortableLine({
+  line, showCheckboxes, onUpdate, onCycleType, onToggleCheck, onPaste, onInsertAfter, onRemove
+}: {
+  line: NoteLine
+  showCheckboxes: boolean
+  onUpdate: (id: string, patch: Partial<NoteLine>) => void
+  onCycleType: (id: string) => void
+  onToggleCheck: (id: string) => void
+  onPaste: (id: string, text: string) => void
+  onInsertAfter: (id: string, nl?: NoteLine) => void
+  onRemove: (id: string) => void
+}) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: line.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  const isTask = line.type === 'task'
+  const showBox = isTask && showCheckboxes
+
+  return (
+    <div ref={setNodeRef} style={style} className="group flex items-start gap-2">
+      <div
+        {...attributes}
+        {...listeners}
+        className="mt-1.5 shrink-0 p-0.5 rounded cursor-grab active:cursor-grabbing text-muted/30 hover:text-amber-500 transition-colors touch-none"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <GripVertical size={14} />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onCycleType(line.id)}
+        className="mt-1.5 shrink-0 text-muted/60 hover:text-amber-500 transition-colors"
+        title="Toggle: text / checkbox / heading"
+      >
+        {line.type === 'heading' ? <Heading1 size={16} /> : line.type === 'task' ? <Square size={16} /> : <Type size={16} />}
+      </button>
+
+      {showBox && (
+        <button
+          type="button"
+          onClick={() => onToggleCheck(line.id)}
+          className={`mt-1 shrink-0 rounded-md border-2 transition-all flex items-center justify-center ${
+            line.checked
+              ? 'bg-amber-500 border-amber-500 text-white'
+              : 'border-muted/50 hover:border-amber-500'
+          }`}
+          style={{ width: 18, height: 18 }}
+          aria-label={line.checked ? 'Mark incomplete' : 'Mark complete'}
+        >
+          {line.checked && <Check size={13} strokeWidth={3} />}
+        </button>
+      )}
+
+      <div className="flex-1 min-w-0" data-line-id={line.id}>
+        <AutoInput
+          value={line.text}
+          placeholder={line.type === 'heading' ? 'Heading' : line.type === 'task' ? 'List item' : 'Note'}
+          className={
+            line.type === 'heading'
+              ? 'font-semibold'
+              : isTask && line.checked
+              ? 'line-through text-muted'
+              : ''
+          }
+          onChange={(v) => onUpdate(line.id, { text: v })}
+          onPaste={(v) => onPaste(line.id, v)}
+          onEnter={() => onInsertAfter(line.id, emptyLine(isTask ? 'task' : 'text'))}
+          onBackspaceEmpty={() => {
+            if (line.type !== 'text') {
+              onUpdate(line.id, { type: 'text', checked: undefined })
+            } else {
+              onRemove(line.id)
+            }
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }: Props) {
   const { settings } = useSettings()
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
+  const lineIds = lines.map((l) => l.id)
+
   const update = (id: string, patch: Partial<NoteLine>) =>
     onChange(lines.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
@@ -76,7 +175,6 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
     const copy = [...lines]
     copy.splice(idx + 1, 0, nl)
     onChange(copy)
-    // focus the textarea inside the new line after React re-renders
     requestAnimationFrame(() => {
       const container = document.querySelector<HTMLDivElement>(`[data-line-id="${nl.id}"]`)
       const textarea = container?.querySelector<HTMLTextAreaElement>('textarea')
@@ -146,72 +244,75 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
     })
   }
 
-  return (
-    <div className="space-y-0.5">
-      {lines.map((line) => {
-        const isTask = line.type === 'task'
-        const showBox = isTask && showCheckboxes
-        return (
-          <div key={line.id} className="group flex items-start gap-2">
-            {/* left control */}
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={() => cycleType(line.id)}
-                className="mt-1.5 shrink-0 text-muted/60 hover:text-amber-500 transition-colors"
-                title="Toggle: text / checkbox / heading"
-              >
-                {line.type === 'heading' ? <Heading1 size={16} /> : line.type === 'task' ? <Square size={16} /> : <Type size={16} />}
-              </button>
-            )}
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = lines.findIndex((l) => l.id === active.id)
+    const newIdx = lines.findIndex((l) => l.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    onChange(arrayMove(lines, oldIdx, newIdx))
+  }
 
-            {/* checkbox */}
-            {showBox && (
-              <button
-                type="button"
-                onClick={() => toggleCheck(line.id)}
-                className={`mt-1 shrink-0 rounded-md border-2 transition-all flex items-center justify-center ${
-                  line.checked
-                    ? 'bg-amber-500 border-amber-500 text-white'
-                    : 'border-muted/50 hover:border-amber-500'
-                }`}
-                style={{ width: 18, height: 18 }}
-                aria-label={line.checked ? 'Mark incomplete' : 'Mark complete'}
-              >
-                {line.checked && <Check size={13} strokeWidth={3} />}
-              </button>
-            )}
-
-            <div className="flex-1 min-w-0" data-line-id={line.id}>
-              <AutoInput
-                ariaLabel={line.type}
-                value={line.text}
-                placeholder={line.type === 'heading' ? 'Heading' : line.type === 'task' ? 'List item' : 'Note'}
-                className={
-                  line.type === 'heading'
-                    ? 'font-semibold'
-                    : isTask && line.checked
-                    ? 'line-through text-muted'
-                    : ''
-                }
-                style={line.type === 'heading' ? { fontSize: settings.headingFontSize } : undefined}
-                onChange={(v) => update(line.id, { text: v })}
-                onPaste={(v) => handlePaste(line.id, v)}
-                onEnter={() => insertAfter(line.id, emptyLine(isTask ? 'task' : 'text'))}
-                onBackspaceEmpty={() => {
-                  // on backspace of empty: if line is task/heading, convert to text first; else remove
-                  if (line.type !== 'text') {
-                    update(line.id, { type: 'text', checked: undefined })
-                  } else {
-                    removeLine(line.id)
+  if (readOnly) {
+    return (
+      <div className="space-y-0.5">
+        {lines.map((line) => {
+          const isTask = line.type === 'task'
+          const showBox = isTask && showCheckboxes
+          return (
+            <div key={line.id} className="flex items-start gap-2" data-line-id={line.id}>
+              {showBox && (
+                <button type="button" disabled
+                  className={`mt-1 shrink-0 rounded-md border-2 flex items-center justify-center ${
+                    line.checked ? 'bg-amber-500 border-amber-500 text-white' : 'border-muted/50'
+                  }`}
+                  style={{ width: 18, height: 18 }}
+                >
+                  {line.checked && <Check size={13} strokeWidth={3} />}
+                </button>
+              )}
+              <div className="flex-1 min-w-0">
+                <AutoInput
+                  value={line.text}
+                  readOnly
+                  placeholder=""
+                  className={
+                    line.type === 'heading' ? 'font-semibold'
+                      : isTask && line.checked ? 'line-through text-muted' : ''
                   }
-                }}
-              />
+                  style={line.type === 'heading' ? { fontSize: settings.headingFontSize } : undefined}
+                  onChange={() => {}}
+                  onEnter={() => {}}
+                  onBackspaceEmpty={() => {}}
+                />
+              </div>
             </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={lineIds} strategy={verticalListSortingStrategy}>
+        <div className="space-y-0.5">
+          {lines.map((line) => (
+            <SortableLine
+              key={line.id}
+              line={line}
+              showCheckboxes={showCheckboxes}
+              onUpdate={update}
+              onCycleType={cycleType}
+              onToggleCheck={toggleCheck}
+              onPaste={handlePaste}
+              onInsertAfter={insertAfter}
+              onRemove={removeLine}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
   )
 }
 

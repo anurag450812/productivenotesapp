@@ -30,7 +30,7 @@ interface NotesCtx {
   removeReminder: (id: string) => void
   remindersFor: (noteId: string) => Reminder[]
   sortedRemindersFor: (noteId: string) => Reminder[]
-  reorderNotes: (activeId: string, overId: string, section: 'pinned' | 'others' | 'regular' | 'reminder') => void
+  reorderNotes: (activeId: string, overId: string, section: 'pinned' | 'others') => void
 }
 
 const Ctx = createContext<NotesCtx>(null as any)
@@ -227,13 +227,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   )
 
   const reorderNotes = useCallback(
-    (activeId: string, overId: string, section: 'pinned' | 'others' | 'regular' | 'reminder') => {
+    (activeId: string, overId: string, section: 'pinned' | 'others') => {
       if (activeId === overId) return
       setNotes((prev) => {
         let filterFn: (n: Note) => boolean
         if (section === 'pinned') filterFn = (n) => n.pinned
-        else if (section === 'reminder') filterFn = (n) => !n.pinned && n.is_reminder_note
-        else if (section === 'regular') filterFn = (n) => !n.pinned && !n.is_reminder_note
         else filterFn = (n) => !n.pinned
 
         const sectionNotes = prev.filter(filterFn)

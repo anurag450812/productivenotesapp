@@ -141,8 +141,7 @@ export default function NoteEditor({ note, onClose }: Props) {
             lines={activeLines}
             showCheckboxes={local.show_checkboxes}
             onChange={(newActive) => {
-              const sorted = [...newActive.filter((l) => l.type !== 'task'), ...newActive.filter((l) => l.type === 'task')]
-              commit({ lines: [...sorted, ...doneLines] })
+              commit({ lines: [...newActive, ...doneLines] })
             }}
           />
 
