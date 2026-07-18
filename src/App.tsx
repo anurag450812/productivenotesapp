@@ -42,9 +42,11 @@ export default function App() {
   const selectedRef = useRef(selected)
   const selectModeRef = useRef(selectMode)
   const viewRef = useRef(view)
+  const notesRef = useRef(notes)
   useEffect(() => { selectedRef.current = selected }, [selected])
   useEffect(() => { selectModeRef.current = selectMode }, [selectMode])
   useEffect(() => { viewRef.current = view }, [view])
+  useEffect(() => { notesRef.current = notes }, [notes])
 
   // sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -79,7 +81,11 @@ export default function App() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedRef.current.size > 0 && !openId) {
         e.preventDefault()
         if (viewRef.current === 'trash') selectedRef.current.forEach(deleteForever)
-        else selectedRef.current.forEach(trashNote)
+        else {
+          const hasPinned = [...selectedRef.current].some((id) => notesRef.current.find((n) => n.id === id)?.pinned)
+          if (hasPinned && !window.confirm('Some selected notes are pinned. Move them to trash?')) return
+          selectedRef.current.forEach(trashNote)
+        }
         setSelected(new Set())
         setSelectMode(false)
       }
@@ -184,6 +190,11 @@ export default function App() {
   const clearSelection = () => { setSelected(new Set()); setSelectMode(false) }
   const selectAll = () => setSelected(new Set(filtered.map((n) => n.id)))
   const bulk = (fn: (id: string) => void) => { selected.forEach(fn); clearSelection() }
+  const confirmBulkTrash = () => {
+    const hasPinned = [...selected].some((id) => notes.find((n) => n.id === id)?.pinned)
+    if (hasPinned && !window.confirm('Some selected notes are pinned. Move them to trash?')) return
+    bulk(trashNote)
+  }
   const uncheck = (id: string) => {
     const n = notes.find((x) => x.id === id)
     if (n) updateNote(id, { lines: n.lines.map((l) => (l.type === 'task' ? { ...l, checked: false } : l)) })
@@ -235,7 +246,6 @@ export default function App() {
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} signOut={signOut} email={user.email}
         onSettings={() => setShowSettings(true)}
         selectMode={selectMode} onSelectMode={enterSelectMode} onSelectDone={clearSelection}
-        sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
       />
 
       {selected.size > 0 && (
@@ -243,7 +253,7 @@ export default function App() {
           count={selected.size} total={filtered.length} view={view}
           onClear={clearSelection} onSelectAll={selectAll}
           onArchive={() => bulk((id) => updateNote(id, { archived: true }))}
-          onTrash={() => bulk(trashNote)} onRestore={() => bulk(restoreNote)}
+          onTrash={confirmBulkTrash} onRestore={() => bulk(restoreNote)}
           onDeleteForever={() => bulk(deleteForever)}
           onPin={() => bulk((id) => updateNote(id, { pinned: true }))}
           onUncheck={() => bulk(uncheck)}
@@ -251,7 +261,7 @@ export default function App() {
         />
       )}
 
-      <main className="max-w-6xl mx-auto px-3 sm:px-6 pb-28 pt-4 safe-bottom">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 pb-28 pt-4 safe-bottom sm:mr-80">
         {view === 'notes' && (
           <div className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
             onClick={() => startQuick(false)}>
@@ -322,18 +332,9 @@ export default function App() {
 
       {/* drag-to-sidebar drop zone indicator */}
       {isDragging && (
-        <div className={`fixed right-0 top-0 bottom-0 z-[42] pointer-events-none flex items-center justify-center ${sidebarOpen ? 'w-80' : 'w-20'}`}>
+        <div className="fixed right-80 top-0 bottom-0 w-20 z-[42] pointer-events-none flex items-center justify-center">
           <div className="h-2/3 w-1 rounded-full bg-amber-500/30 animate-pulse" />
         </div>
-      )}
-
-      {/* sidebar toggle tab (when closed) */}
-      {!sidebarOpen && (
-        <button onClick={() => setSidebarOpen(true)}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-[51] bg-surface border border-border border-r-0 rounded-l-lg px-1.5 py-3 text-muted hover:text-amber-500 transition-colors shadow-md hidden sm:block"
-          title="Open sidebar">
-          <PanelRight size={16} />
-        </button>
       )}
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}
@@ -377,9 +378,6 @@ function TopBar(props: any) {
         </button>
         <button onClick={props.toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title={`Theme: ${props.themeMode}`}>
           {props.themeMode === 'system' ? <Monitor size={19} /> : props.themeMode === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-        </button>
-        <button onClick={props.onToggleSidebar} className={`p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors hidden sm:block ${props.sidebarOpen ? 'text-amber-500' : 'text-muted'}`} title="Toggle sidebar">
-          <PanelRight size={19} />
         </button>
         {props.selectMode ? (
           <button onClick={props.onSelectDone}

@@ -227,7 +227,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar }: 
           <Tool title={local.archived ? 'Unarchive' : 'Archive'} onClick={() => { commit({ archived: !local.archived }); close() }}>
             <Archive size={18} />
           </Tool>
-          <Tool title="Move to trash" onClick={() => { trashNote(note.id); dirtyRef.current = false; onClose() }}><Trash2 size={18} /></Tool>
+          <Tool title="Move to trash" onClick={() => { if (note.pinned && !window.confirm('This note is pinned. Move it to trash?')) return; trashNote(note.id); dirtyRef.current = false; onClose() }}><Trash2 size={18} /></Tool>
           <Tool title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon size={18} /></Tool>
           <Tool title={local.is_reminder_note ? 'Disable reminders' : 'Enable reminders'} onClick={() => commit({ is_reminder_note: !local.is_reminder_note })}>
             {local.is_reminder_note ? <Bell size={18} className="text-amber-500" /> : <BellOff size={18} />}
