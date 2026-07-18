@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, Plus, Trash2, Check, Repeat, CalendarClock } from 'lucide-react'
 import type { Reminder, RepeatType } from '@/lib/types'
 import { useNotes } from '@/context/NotesContext'
-import { relativeLabel, repeatLabel, DOW_NAMES, sortRemindersByUpcoming } from '@/lib/reminders'
+import { relativeLabel, repeatLabel, DOW_NAMES } from '@/lib/reminders'
 import { format } from 'date-fns'
 
 export default function RemindersList({ noteId }: { noteId: string }) {

@@ -34,7 +34,6 @@ export interface Note {
   is_reminder_note: boolean
   collapsed: boolean
   show_checkboxes: boolean
-  list_mode: boolean // when true, empty checkbox shown for text lines too
   image_url: string | null
   position: number
   created_at: string

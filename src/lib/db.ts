@@ -25,7 +25,6 @@ export function createBlankNote(userId: string, overrides: Partial<Note> = {}): 
     is_reminder_note: false,
     collapsed: false,
     show_checkboxes: true,
-    list_mode: false,
     image_url: null,
     position: 0,
     created_at: now,
@@ -115,4 +114,3 @@ export function createBlankReminder(noteId: string, userId: string, title = ''):
 }
 
 export type { RepeatType, NoteColor }
-export { isSupabaseConfigured }

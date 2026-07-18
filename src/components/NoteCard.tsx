@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Pin, Bell, Check, GripVertical } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
@@ -19,10 +19,9 @@ interface Props {
   onToggleSelect: () => void
   onLongPress: () => void
   onPin?: () => void
-  showAllLines?: boolean
 }
 
-export default function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect, onLongPress, onPin, showAllLines }: Props) {
+function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect, onLongPress, onPin }: Props) {
   const { sortedRemindersFor } = useNotes()
   const { theme } = useTheme()
   const { settings } = useSettings()
@@ -51,7 +50,7 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
 
   const nonEmptyLines = note.lines.filter((l) => l.text.trim() !== '')
   const heading = note.title || nonEmptyLines.find((l) => l.type === 'heading')?.text || nonEmptyLines[0]?.text || 'New note'
-  const previewLines = showAllLines ? nonEmptyLines : (note.collapsed ? [] : nonEmptyLines.slice(0, note.title ? 6 : 7))
+  const previewLines = note.collapsed ? [] : nonEmptyLines.slice(0, note.title ? 6 : 7)
 
   const startPress = () => {
     pressed.current = false
@@ -195,3 +194,5 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
     </motion.div>
   )
 }
+
+export default memo(NoteCard)

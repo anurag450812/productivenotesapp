@@ -18,6 +18,7 @@ interface Props {
   onReorder: (newOrder: string[]) => void
   isDragging?: boolean
   onToggleTask?: (noteId: string, lineId: string) => void
+  width: number
   onWidthChange?: (w: number) => void
 }
 
@@ -25,12 +26,9 @@ const MIN_W = 240
 const MAX_W = 600
 const DEFAULT_W = 320
 
-export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReorder, isDragging, onToggleTask, onWidthChange }: Props) {
+export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReorder, isDragging, onToggleTask, width, onWidthChange }: Props) {
   const { theme } = useTheme()
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [width, setWidth] = useState<number>(() => {
-    try { return parseInt(localStorage.getItem('sidebarWidth') || '') || DEFAULT_W } catch { return DEFAULT_W }
-  })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -50,7 +48,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
       if (!resizing.current) return
       const delta = startX.current - ev.clientX
       const newW = Math.max(MIN_W, Math.min(MAX_W, startW.current + delta))
-      setWidth(newW)
+      onWidthChange?.(newW)
     }
     const onUp = () => {
       resizing.current = false
@@ -63,12 +61,6 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
     document.addEventListener('pointerup', onUp)
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
-  }, [width])
-
-  // persist width
-  useEffect(() => {
-    localStorage.setItem('sidebarWidth', String(width))
-    onWidthChange?.(width)
   }, [width, onWidthChange])
 
   const sidebarNotes = noteIds

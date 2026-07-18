@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Search, LayoutGrid, List, Sun, Moon, Archive, Trash2, NotebookPen,
@@ -19,12 +19,13 @@ import Sidebar from '@/components/Sidebar'
 import ReminderPopup from '@/components/ReminderPopup'
 import RemindersConsolidated from '@/components/RemindersConsolidated'
 import { Capacitor } from '@capacitor/core'
+import { requestPermission, syncReminders, isPermissionGranted, initNotifications } from '@/lib/notifications'
 
 type View = 'notes' | 'archive' | 'trash' | 'reminders'
 
 export default function App() {
   const { user, loading, signOut } = useAuth()
-  const { notes, addNote, updateNote, trashNote, restoreNote, deleteForever, emptyTrashAll, reorderNotes } = useNotes()
+  const { notes, reminders, addNote, updateNote, trashNote, restoreNote, deleteForever, emptyTrashAll, reorderNotes } = useNotes()
   const { theme, themeMode, toggle } = useTheme()
   const [view, setView] = useState<View>('notes')
   const [layout, setLayout] = useState<'grid' | 'list'>(() =>
@@ -62,6 +63,12 @@ export default function App() {
   const dragPosRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => { localStorage.setItem('sidebarNotes', JSON.stringify(sidebarNotes)) }, [sidebarNotes])
+
+  // debounce sidebar width persistence
+  useEffect(() => {
+    const t = setTimeout(() => localStorage.setItem('sidebarWidth', String(sidebarWidth)), 300)
+    return () => clearTimeout(t)
+  }, [sidebarWidth])
 
   // auto-open sidebar when note editor opens (if sidebar has notes)
   useEffect(() => {
@@ -101,9 +108,8 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
-  const isDesktop = typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true
-
-  const isTouch = Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches
+  const isDesktop = useState(() => window.matchMedia('(min-width: 640px)').matches)[0]
+  const isTouch = useState(() => Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches)[0]
   const selectionMode = selectMode || selected.size > 0
 
   const sensors = useSensors(
@@ -150,6 +156,22 @@ export default function App() {
       document.removeEventListener('pointerup', onPointerUp)
     }
   }, [])
+
+  // notification permission request and reminder sync
+  const notifRequested = useRef(false)
+  const openNoteById = useCallback((noteId: string) => {
+    setOpenId(noteId)
+    if (isDesktop) setSidebarOpen(true)
+  }, [isDesktop])
+  useEffect(() => {
+    if (!user || notifRequested.current) return
+    notifRequested.current = true
+    initNotifications(openNoteById)
+  }, [user, openNoteById])
+  useEffect(() => {
+    if (!user || !isPermissionGranted()) return
+    syncReminders(reminders, openNoteById)
+  }, [reminders, user, openNoteById])
 
   const filtered = useMemo(() => {
     let list = notes
@@ -351,7 +373,7 @@ export default function App() {
         </div>
       )}
 
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} width={sidebarWidth}
         noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} onReorder={reorderSidebar}
         isDragging={isDragging} onToggleTask={toggleSidebarTask} onWidthChange={setSidebarWidth} />
 
@@ -447,14 +469,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function NotesGrid(props: any) {
-  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote, showAllLines } = props
+  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote } = props
   return (
     <div className={layout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}>
       {notes.map((n: Note) => (
         <div key={n.id} data-note-card={n.id} className="break-inside-avoid mb-3">
           <NoteCard note={n} selected={selected.has(n.id)} selectionMode={selectionMode} view={layout}
             onOpen={(rect?: DOMRect) => onOpen(n.id, rect)} onToggleSelect={() => onToggleSelect(n.id)} onLongPress={() => onLongPress(n.id)}
-            onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} showAllLines={showAllLines} />
+            onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} />
         </div>
       ))}
     </div>

@@ -15,7 +15,6 @@ const TRASH_MS = TRASH_DAYS * 24 * 60 * 60 * 1000
 interface NotesCtx {
   notes: Note[]
   reminders: Reminder[]
-  loading: boolean
   // notes ops
   addNote: (overrides?: Partial<Note>) => Note
   updateNote: (id: string, patch: Partial<Note>) => void
@@ -28,7 +27,6 @@ interface NotesCtx {
   addReminder: (noteId: string, title?: string) => Reminder
   updateReminder: (id: string, patch: Partial<Reminder>) => void
   removeReminder: (id: string) => void
-  remindersFor: (noteId: string) => Reminder[]
   sortedRemindersFor: (noteId: string) => Reminder[]
   reorderNotes: (activeId: string, overId: string, section: 'pinned' | 'others') => void
 }
@@ -40,7 +38,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [notes, setNotes] = useState<Note[]>([])
   const [reminders, setReminders] = useState<Reminder[]>([])
-  const [loading, setLoading] = useState(true)
   const debounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const dirtyRef = useRef<Set<string>>(new Set())
 
@@ -49,17 +46,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (!user) {
       setNotes([])
       setReminders([])
-      setLoading(false)
       return
     }
-    setLoading(true)
     Promise.all([fetchNotes(user.id), fetchReminders(user.id)])
       .then(([n, r]) => {
         setNotes(n)
         setReminders(r)
       })
       .catch((e) => console.error('load error', e))
-      .finally(() => setLoading(false))
   }, [user])
 
   // ---- Realtime ----
@@ -131,6 +125,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const notesRef = useRef<Note[]>([])
+  const initialLoadDone = useRef(false)
   useEffect(() => {
     notesRef.current = notes
   }, [notes])
@@ -208,15 +203,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const updateReminder = useCallback((id: string, patch: Partial<Reminder>) => {
-    setReminders((prev) => {
-      const idx = prev.findIndex((r) => r.id === id)
-      if (idx === -1) return prev
-      const copy = [...prev]
-      copy[idx] = { ...copy[idx], ...patch, updated_at: new Date().toISOString() }
-      const target = copy[idx]
-      upsertReminder(target).catch((e) => console.error('updateReminder', e))
+    const prev = remindersRef.current
+    const idx = prev.findIndex((r) => r.id === id)
+    if (idx === -1) return
+    const updated = { ...prev[idx], ...patch, updated_at: new Date().toISOString() }
+    setReminders((p) => {
+      const i = p.findIndex((r) => r.id === id)
+      if (i === -1) return p
+      const copy = [...p]
+      copy[i] = updated
       return copy
     })
+    upsertReminder(updated).catch((e) => console.error('updateReminder', e))
   }, [])
 
   const removeReminder = useCallback(async (id: string) => {
@@ -224,7 +222,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     await deleteReminder(id)
   }, [])
 
-  const remindersFor = useCallback((noteId: string) => reminders.filter((r) => r.note_id === noteId), [reminders])
   const sortedRemindersFor = useCallback(
     (noteId: string) => sortRemindersByUpcoming(reminders.filter((r) => r.note_id === noteId)),
     [reminders]
@@ -261,17 +258,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     []
   )
 
-  // Auto-expire trashed notes older than 30 days (clean on load)
+  // Auto-expire trashed notes older than 30 days (clean once after load)
   useEffect(() => {
-    if (!user) return
+    if (!user || initialLoadDone.current) return
+    if (notes.length === 0) return
+    initialLoadDone.current = true
     const expired = notes.filter((n) => n.trashed && n.trashed_at && Date.now() - new Date(n.trashed_at).getTime() > TRASH_MS)
     expired.forEach((n) => dbDeleteNote(n.id).catch(() => {}))
   }, [user, notes])
 
   const value: NotesCtx = {
-    notes, reminders, loading,
+    notes, reminders,
     addNote, updateNote, saveNoteNow, trashNote, restoreNote, deleteForever, emptyTrashAll,
-    addReminder, updateReminder, removeReminder, remindersFor, sortedRemindersFor, reorderNotes
+    addReminder, updateReminder, removeReminder, sortedRemindersFor, reorderNotes
   }
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

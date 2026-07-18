@@ -315,5 +315,3 @@ export default function LineEditor({ lines, showCheckboxes, readOnly, onChange }
     </DndContext>
   )
 }
-
-export { nanoid }
