@@ -30,7 +30,6 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   const [collapseChecked, setCollapseChecked] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const dirtyRef = useRef(false)
-  const [isClosing, setIsClosing] = useState(false)
 
   useEffect(() => {
     if (!dirtyRef.current) setLocal(note)
@@ -55,9 +54,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
     }
     try { await saveNoteNow(note.id) } catch { /* ignore save errors on close */ }
     dirtyRef.current = false
-    if (immediate) { onClose(); return }
-    setIsClosing(true)
-    setTimeout(() => onClose(), 200)
+    onClose()
   }
 
   const onImage = async (file: File) => {
@@ -105,7 +102,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   let animate: Record<string, any>
   let exit: Record<string, any>
 
-  if (noteRect && !isClosing) {
+  if (noteRect) {
     const cx = noteRect.left + noteRect.width / 2
     const cy = noteRect.top + noteRect.height / 2
     const sX = noteRect.width / editorW
@@ -225,7 +222,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
           <Tool title={local.archived ? 'Unarchive' : 'Archive'} onClick={() => { commit({ archived: !local.archived }); close() }}>
             <Archive size={18} />
           </Tool>
-          <Tool title="Move to trash" onClick={() => { trashNote(note.id); dirtyRef.current = false; setIsClosing(true); setTimeout(() => onClose(), 200) }}><Trash2 size={18} /></Tool>
+          <Tool title="Move to trash" onClick={() => { trashNote(note.id); dirtyRef.current = false; onClose() }}><Trash2 size={18} /></Tool>
           <Tool title="Add image" onClick={() => fileRef.current?.click()}><ImageIcon size={18} /></Tool>
           <Tool title={local.is_reminder_note ? 'Disable reminders' : 'Enable reminders'} onClick={() => commit({ is_reminder_note: !local.is_reminder_note })}>
             {local.is_reminder_note ? <Bell size={18} className="text-amber-500" /> : <BellOff size={18} />}
