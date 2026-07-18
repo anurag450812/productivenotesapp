@@ -207,6 +207,7 @@ export default function App() {
     setSidebarOpen(true)
   }
   const removeFromSidebar = (id: string) => setSidebarNotes((prev) => prev.filter((n) => n !== id))
+  const reorderSidebar = (newOrder: string[]) => setSidebarNotes(newOrder)
   const bulkAddToSidebar = () => { selected.forEach(addToSidebar); clearSelection() }
 
   const toggleSidebarTask = (noteId: string, lineId: string) => {
@@ -307,12 +308,23 @@ export default function App() {
           </Section>
         )}
 
-        {(view === 'archive' || view === 'reminders') && filtered.length > 0 && (
+        {view === 'archive' && filtered.length > 0 && (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDndStart} onDragEnd={(e) => handleDragEnd(e, 'others')}>
             <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
               <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
                 onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
                 onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote} />
+            </SortableContext>
+          </DndContext>
+        )}
+
+        {view === 'reminders' && filtered.length > 0 && (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDndStart} onDragEnd={(e) => handleDragEnd(e, 'others')}>
+            <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
+              <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
+                onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
+                onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote}
+                showAllLines />
             </SortableContext>
           </DndContext>
         )}
@@ -339,7 +351,7 @@ export default function App() {
       )}
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}
-        noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar}
+        noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} onReorder={reorderSidebar}
         isDragging={isDragging} onToggleTask={toggleSidebarTask} />
 
       <AnimatePresence>
@@ -434,14 +446,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function NotesGrid(props: any) {
-  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote } = props
+  const { notes, layout, selected, selectionMode, onOpen, onToggleSelect, onLongPress, isTouch, onUpdateNote, showAllLines } = props
   return (
     <div className={layout === 'grid' ? 'columns-2 md:columns-3 lg:columns-4 gap-3 [column-fill:_balance]' : 'flex flex-col gap-2.5'}>
       {notes.map((n: Note) => (
         <div key={n.id} data-note-card={n.id} className="break-inside-avoid mb-3">
           <NoteCard note={n} selected={selected.has(n.id)} selectionMode={selectionMode} view={layout}
             onOpen={(rect?: DOMRect) => onOpen(n.id, rect)} onToggleSelect={() => onToggleSelect(n.id)} onLongPress={() => onLongPress(n.id)}
-            onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} />
+            onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} showAllLines={showAllLines} />
         </div>
       ))}
     </div>

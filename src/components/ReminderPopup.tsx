@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Clock, Check, Timer, X, AlertTriangle } from 'lucide-react'
+import { Bell, Clock, Check, Timer, EyeOff, AlertTriangle } from 'lucide-react'
 import type { Reminder } from '@/lib/types'
 import { useNotes } from '@/context/NotesContext'
 import { nextDueDate, relativeLabel } from '@/lib/reminders'
@@ -8,26 +8,19 @@ import { addDays } from 'date-fns'
 
 export default function ReminderPopup() {
   const { reminders, notes, updateReminder } = useNotes()
-  const [dismissed, setDismissed] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('dismissedReminders') || '[]')) } catch { return new Set() }
-  })
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [confirmId, setConfirmId] = useState<string | null>(null)
 
-  // persist dismissed to localStorage
-  useEffect(() => {
-    localStorage.setItem('dismissedReminders', JSON.stringify([...dismissed]))
-  }, [dismissed])
-
-  // Find due reminders: not done, due_at <= now, not dismissed
+  // Find due reminders: not done, due_at <= now, not hidden this session
   const dueReminders = useMemo(() => {
     const now = new Date()
     return reminders.filter((r) => {
       if (r.done) return false
-      if (dismissed.has(r.id)) return false
+      if (hiddenIds.has(r.id)) return false
       const due = nextDueDate(r, now)
       return due.getTime() <= now.getTime()
     })
-  }, [reminders, dismissed])
+  }, [reminders, hiddenIds])
 
   // Check periodically (every 30s)
   const [, setTick] = useState(0)
@@ -39,7 +32,7 @@ export default function ReminderPopup() {
   if (dueReminders.length === 0) return null
 
   return (
-    <div className="fixed left-4 top-20 z-[60] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+    <div className="fixed left-4 bottom-4 z-[60] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
       <AnimatePresence>
         {dueReminders.map((r) => (
           <ReminderCard
@@ -52,12 +45,12 @@ export default function ReminderPopup() {
               updateReminder(r.id, { due_at: newDue.toISOString() })
             }}
             onComplete={() => setConfirmId(r.id)}
-            onDismiss={() => setDismissed((prev) => new Set([...prev, r.id]))}
+            onHide={() => setHiddenIds((prev) => new Set([...prev, r.id]))}
             isConfirming={confirmId === r.id}
             onConfirmYes={() => {
               updateReminder(r.id, { done: true, completed_at: new Date().toISOString() })
               setConfirmId(null)
-              setDismissed((prev) => new Set([...prev, r.id]))
+              setHiddenIds((prev) => new Set([...prev, r.id]))
             }}
             onConfirmNo={() => setConfirmId(null)}
           />
@@ -68,14 +61,14 @@ export default function ReminderPopup() {
 }
 
 function ReminderCard({
-  r, note, onSnooze, onComplete, onDismiss,
+  r, note, onSnooze, onComplete, onHide,
   isConfirming, onConfirmYes, onConfirmNo
 }: {
   r: Reminder
   note: any
   onSnooze: () => void
   onComplete: () => void
-  onDismiss: () => void
+  onHide: () => void
   isConfirming: boolean
   onConfirmYes: () => void
   onConfirmNo: () => void
@@ -115,9 +108,6 @@ function ReminderCard({
                 <span>{relativeLabel(r)}</span>
               </div>
             </div>
-            <button onClick={onDismiss} className="text-red-400 hover:text-red-600 transition-colors p-0.5">
-              <X size={14} />
-            </button>
           </div>
 
           {/* linked note tasks */}
@@ -164,6 +154,13 @@ function ReminderCard({
               >
                 <Check size={14} />
                 Complete
+              </button>
+              <button
+                onClick={onHide}
+                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/50 text-muted text-xs font-semibold transition-colors border border-red-200 dark:border-red-800"
+                title="Hide until next reload"
+              >
+                <EyeOff size={14} />
               </button>
             </div>
           )}
