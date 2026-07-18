@@ -45,7 +45,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
   const bg = noteBg(local.color, theme === 'dark')
   const bd = noteBorder(local.color, theme === 'dark')
 
-  const close = async () => {
+  const close = async (immediate = false) => {
     const hasContent = local.title.trim() !== '' || local.lines.some((l) => l.text.trim() !== '') || local.image_url
     if (!hasContent) {
       try { await deleteForever(note.id) } catch { /* ignore */ }
@@ -55,6 +55,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
     }
     try { await saveNoteNow(note.id) } catch { /* ignore save errors on close */ }
     dirtyRef.current = false
+    if (immediate) { onClose(); return }
     setIsClosing(true)
     setTimeout(() => onClose(), 200)
   }
@@ -131,7 +132,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={close}
+      onClick={() => close(true)}
     >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
@@ -241,7 +242,7 @@ export default function NoteEditor({ note, noteRect, onClose }: Props) {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImage(e.target.files[0])} />
 
           <div className="ml-auto flex items-center gap-1">
-            <button onClick={close} className="text-sm font-medium px-4 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+            <button onClick={() => close()} className="text-sm font-medium px-4 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
               Done
             </button>
           </div>
