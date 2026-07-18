@@ -17,6 +17,7 @@ import NoteEditor from '@/components/NoteEditor'
 import SettingsPanel from '@/components/SettingsPanel'
 import Sidebar from '@/components/Sidebar'
 import ReminderPopup from '@/components/ReminderPopup'
+import RemindersConsolidated from '@/components/RemindersConsolidated'
 import { Capacitor } from '@capacitor/core'
 
 type View = 'notes' | 'archive' | 'trash' | 'reminders'
@@ -53,6 +54,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarNotes, setSidebarNotes] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('sidebarNotes') || '[]') } catch { return [] }
+  })
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('sidebarWidth') || '') || 320 } catch { return 320 }
   })
   const [isDragging, setIsDragging] = useState(false)
   const dragPosRef = useRef<{ x: number; y: number } | null>(null)
@@ -96,6 +100,8 @@ export default function App() {
   }, [openId, trashNote, deleteForever])
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
+
+  const isDesktop = typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true
 
   const isTouch = Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches
   const selectionMode = selectMode || selected.size > 0
@@ -263,7 +269,7 @@ export default function App() {
         />
       )}
 
-      <main className="max-w-6xl mx-auto px-3 sm:px-6 pb-28 pt-4 safe-bottom sm:mr-80">
+      <main className="px-3 sm:px-6 pb-28 pt-4 safe-bottom max-w-6xl mx-auto" style={isDesktop ? { marginRight: sidebarWidth } : undefined}>
         {view === 'notes' && (
           <div className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
             onClick={() => startQuick(false)}>
@@ -318,15 +324,8 @@ export default function App() {
           </DndContext>
         )}
 
-        {view === 'reminders' && filtered.length > 0 && (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDndStart} onDragEnd={(e) => handleDragEnd(e, 'others')}>
-            <SortableContext items={filtered.map((n) => n.id)} strategy={rectSortingStrategy}>
-              <NotesGrid notes={filtered} layout={layout} selected={selected} selectionMode={selectionMode}
-                onOpen={handleNoteOpen} onToggleSelect={toggleSelect}
-                onLongPress={(id: string) => { setSelectMode(true); setSelected(new Set([id])) }} isTouch={isTouch} onUpdateNote={updateNote}
-                showAllLines />
-            </SortableContext>
-          </DndContext>
+        {view === 'reminders' && (
+          <RemindersConsolidated />
         )}
 
         {view === 'trash' && filtered.length > 0 && (
@@ -352,7 +351,7 @@ export default function App() {
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)}
         noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} onReorder={reorderSidebar}
-        isDragging={isDragging} onToggleTask={toggleSidebarTask} />
+        isDragging={isDragging} onToggleTask={toggleSidebarTask} onWidthChange={setSidebarWidth} />
 
       <AnimatePresence>
         {marquee && <div className="marquee" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}

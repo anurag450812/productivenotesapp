@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronRight, Pin, Check, GripVertical } from 'lucide-react'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
@@ -18,15 +18,58 @@ interface Props {
   onReorder: (newOrder: string[]) => void
   isDragging?: boolean
   onToggleTask?: (noteId: string, lineId: string) => void
+  onWidthChange?: (w: number) => void
 }
 
-export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReorder, isDragging, onToggleTask }: Props) {
+const MIN_W = 240
+const MAX_W = 600
+const DEFAULT_W = 320
+
+export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReorder, isDragging, onToggleTask, onWidthChange }: Props) {
   const { theme } = useTheme()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [width, setWidth] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('sidebarWidth') || '') || DEFAULT_W } catch { return DEFAULT_W }
+  })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
+
+  // resize via left-edge drag
+  const resizing = useRef(false)
+  const startX = useRef(0)
+  const startW = useRef(0)
+
+  const onResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault()
+    resizing.current = true
+    startX.current = e.clientX
+    startW.current = width
+    const onMove = (ev: PointerEvent) => {
+      if (!resizing.current) return
+      const delta = startX.current - ev.clientX
+      const newW = Math.max(MIN_W, Math.min(MAX_W, startW.current + delta))
+      setWidth(newW)
+    }
+    const onUp = () => {
+      resizing.current = false
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [width])
+
+  // persist width
+  useEffect(() => {
+    localStorage.setItem('sidebarWidth', String(width))
+    onWidthChange?.(width)
+  }, [width, onWidthChange])
 
   const sidebarNotes = noteIds
     .map((id) => notes.find((n) => n.id === id))
@@ -45,7 +88,15 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
   }
 
   const sidebarContent = (
-    <div className={`h-full flex flex-col bg-surface border-l border-border ${isDragging ? 'pointer-events-none' : ''}`}>
+    <div className={`h-full flex flex-col bg-surface border-l border-border relative ${isDragging ? 'pointer-events-none' : ''}`}>
+      {/* resize handle */}
+      <div
+        onPointerDown={onResizeStart}
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-amber-500/40 transition-colors z-10 group hidden sm:block"
+      >
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-border group-hover:bg-amber-500 transition-colors" />
+      </div>
+
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -90,7 +141,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
       {/* footer */}
       {sidebarNotes.length > 0 && (
         <div className="px-4 py-2.5 border-t border-border shrink-0 text-center">
-          <p className="text-[11px] text-muted">Drag to reorder · Click headings to expand</p>
+          <p className="text-[11px] text-muted">Drag to reorder · Click headings to expand · Drag edge to resize</p>
         </div>
       )}
     </div>
@@ -118,7 +169,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
       </div>
 
       {/* desktop: permanent panel */}
-      <div className="hidden sm:block fixed right-0 top-0 bottom-0 w-80 z-[30]">
+      <div className="hidden sm:block fixed right-0 top-0 bottom-0 z-[30]" style={{ width }}>
         {sidebarContent}
       </div>
     </>
@@ -170,27 +221,27 @@ function SortableSidebarCard({
         }}
       >
         {/* heading row */}
-        <div className="flex items-stretch">
+        <div className="flex items-start">
           <button
             onPointerDown={(e) => e.stopPropagation()}
             {...listeners}
-            className="px-1.5 flex items-center text-muted/50 hover:text-muted cursor-grab active:cursor-grabbing shrink-0"
+            className="px-1.5 flex items-center text-muted/50 hover:text-muted cursor-grab active:cursor-grabbing shrink-0 mt-2.5"
             title="Drag to reorder"
           >
             <GripVertical size={14} />
           </button>
           <button
             onClick={onToggle}
-            className="flex-1 flex items-center gap-2 px-2 py-2.5 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors min-w-0"
+            className="flex-1 flex items-start gap-2 px-2 py-2.5 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors min-w-0"
           >
-            <motion.span animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.15 }} className="shrink-0">
+            <motion.span animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.15 }} className="shrink-0 mt-0.5">
               <ChevronRight size={14} className="text-muted" />
             </motion.span>
-            <span className="text-sm font-medium truncate">{heading}</span>
+            <span className="text-sm font-semibold leading-snug break-words">{heading}</span>
           </button>
           <button
             onClick={onRemove}
-            className="px-2 text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors shrink-0 self-center"
+            className="px-2 text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors shrink-0 mt-2"
             title="Remove from sidebar"
           >
             <X size={14} />
@@ -228,7 +279,7 @@ function SortableSidebarCard({
                           {l.checked && <Check size={9} strokeWidth={3} className="text-white" />}
                         </button>
                       )}
-                      <span className={l.type === 'task' && l.checked ? 'line-through text-muted' : ''}>
+                      <span className={`${l.type === 'task' && l.checked ? 'line-through text-muted' : ''} break-words`}>
                         {l.text}
                       </span>
                     </div>
