@@ -16,6 +16,7 @@ import NoteCard from '@/components/NoteCard'
 import NoteEditor from '@/components/NoteEditor'
 import SettingsPanel from '@/components/SettingsPanel'
 import Sidebar from '@/components/Sidebar'
+import ReminderPopup from '@/components/ReminderPopup'
 import { Capacitor } from '@capacitor/core'
 
 type View = 'notes' | 'archive' | 'trash' | 'reminders'
@@ -348,6 +349,8 @@ export default function App() {
       <AnimatePresence>
         {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} onAddToSidebar={() => addToSidebar(openNote.id)} />}
       </AnimatePresence>
+
+      <ReminderPopup />
 
       <AnimatePresence>
         {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
