@@ -37,6 +37,12 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
     if (!dirtyRef.current) setLocal(note)
   }, [note])
 
+  // body scroll lock when editor is open
+  useEffect(() => {
+    document.body.classList.add('editor-open')
+    return () => document.body.classList.remove('editor-open')
+  }, [])
+
   const commit = (patch: Partial<Note>) => {
     dirtyRef.current = true
     setLocal((prev) => ({ ...prev, ...patch }))
@@ -97,7 +103,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
   const vw = typeof window !== 'undefined' ? window.innerWidth : 640
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   const desktop = vw >= 640
-  const editorW = desktop ? Math.min(640, vw - 32) : vw
+  const editorW = desktop ? Math.min(640, vw - 32) : vw - 16
 
   let initial: Record<string, any>
   let animate: Record<string, any>
@@ -110,14 +116,14 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
     const s = Math.min(sX, 1)
     const startTop = cy - noteRect.height / 2
     const startLeft = cx - editorW * s / 2
-    const endTop = desktop ? '50%' : vh - 200
+    const endTop = desktop ? '50%' : 48
     const endLeft = (vw - editorW) / 2
 
     initial = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, scale: s, borderRadius: 12, opacity: 1 }
     animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-50%' : 0, scale: 1, borderRadius: 16, opacity: 1 }
     exit = { position: 'fixed' as const, top: startTop, left: startLeft, width: editorW, scale: s, borderRadius: 12, opacity: 0 }
   } else {
-    const endTop = desktop ? '50%' : vh - 200
+    const endTop = desktop ? '50%' : 48
     const endLeft = (vw - editorW) / 2
     initial = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-40%' : 40, scale: 0.92, opacity: 0 }
     animate = { position: 'fixed' as const, top: endTop, left: endLeft, width: editorW, y: desktop ? '-50%' : 0, scale: 1, opacity: 1 }
@@ -142,7 +148,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
         <div className="w-full h-full flex items-center justify-center p-4">
           <motion.div
             data-note-editor
-            className="pointer-events-auto w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            className="pointer-events-auto w-full max-w-2xl flex flex-col max-h-[calc(100dvh-6rem)] sm:max-h-[85vh] overflow-hidden"
             style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1 }}
             initial={initial}
             animate={animate}
@@ -248,7 +254,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImage(e.target.files[0])} />
 
           <div className="ml-auto flex items-center gap-1">
-            <button onClick={() => close()} className="text-sm font-medium px-4 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors">
+            <button onClick={() => close()} className="text-sm font-medium px-4 py-2.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors min-h-[44px]">
               Done
             </button>
           </div>
@@ -265,7 +271,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
               <button
                 key={c}
                 onClick={() => { commit({ color: c }); setShowPalette(false) }}
-                className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+                className="w-9 h-9 rounded-full border-2 transition-transform hover:scale-110"
                 style={{ backgroundColor: theme === 'dark' ? NOTE_COLORS[c].dark : NOTE_COLORS[c].light, borderColor: local.color === c ? '#f59e0b' : 'transparent' }}
                 title={NOTE_COLORS[c].name}
               />
@@ -281,7 +287,7 @@ export default function NoteEditor({ note, noteRect, onClose, onAddToSidebar, si
 
 function Tool({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} title={title} className="p-2 rounded-full text-muted hover:bg-black/5 dark:hover:bg-white/10 hover:text-amber-500 transition-colors">
+    <button onClick={onClick} title={title} className="p-2.5 rounded-full text-muted hover:bg-black/5 dark:hover:bg-white/10 hover:text-amber-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
       {children}
     </button>
   )

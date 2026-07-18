@@ -107,7 +107,7 @@ function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect,
       onPointerDown={handlePointerDown}
       {...attributes}
       onClick={handleClick}
-      className={`group relative rounded-xl2 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow select-none touch-none ${
+      className={`group relative rounded-xl2 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-shadow select-none ${
         isList ? 'w-full' : ''
       } ${selected ? 'ring-2 ring-amber-500' : ''} ${isDragging ? 'shadow-xl ring-2 ring-amber-400' : ''}`}
       style={{
@@ -121,7 +121,7 @@ function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect,
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onPin() }}
-          className="absolute top-2 right-8 z-10 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 hover:bg-amber-500/20 text-muted hover:text-amber-500"
+          className="absolute top-2 right-8 z-10 p-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-surface/80 hover:bg-amber-500/20 text-muted hover:text-amber-500 min-w-[44px] min-h-[44px] flex items-center justify-center"
           title={note.pinned ? 'Unpin' : 'Pin'}
         >
           <Pin size={14} fill={note.pinned ? 'currentColor' : 'none'} />

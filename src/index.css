@@ -31,6 +31,13 @@ body {
   color: rgb(var(--c-text));
   transition: background-color 0.3s ease, color 0.3s ease;
   overscroll-behavior-y: none;
+  touch-action: manipulation;
+}
+
+body.editor-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }
 
 /* Keep-style line editing: each line is a contenteditable-ish input but we use textareas/inputs */
@@ -68,7 +75,7 @@ body {
 }
 .animate-fade-in-up { animation: fadeInUp 0.22s ease-out both; }
 
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-bottom { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
 .safe-top { padding-top: env(safe-area-inset-top); }
 
 @keyframes pulseGentle {

@@ -96,8 +96,8 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
           Sidebar
           {sidebarNotes.length > 0 && <span className="text-xs text-muted font-normal">({sidebarNotes.length})</span>}
         </h3>
-        <button onClick={onClose} className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors sm:hidden">
-          <X size={16} />
+        <button onClick={onClose} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted transition-colors sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <X size={20} />
         </button>
       </div>
 

@@ -108,6 +108,21 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
+  // global escape / hardware back button handler
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (openId) { setNoteRect(null); setOpenId(null) }
+        else if (sidebarOpen) setSidebarOpen(false)
+        else if (menuOpen) setMenuOpen(false)
+        else if (showSettings) setShowSettings(false)
+        else if (selected.size > 0 || selectMode) { setSelected(new Set()); setSelectMode(false) }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [openId, sidebarOpen, menuOpen, showSettings, selected.size, selectMode])
+
   const isDesktop = useState(() => window.matchMedia('(min-width: 640px)').matches)[0]
   const isTouch = useState(() => Capacitor.isNativePlatform() || matchMedia('(hover: none)').matches)[0]
   const selectionMode = selectMode || selected.size > 0
@@ -197,8 +212,8 @@ export default function App() {
     const handler = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('[data-menu-dropdown]')) setMenuOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
   }, [menuOpen])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
@@ -277,6 +292,8 @@ export default function App() {
         onSettings={() => setShowSettings(true)}
         selectMode={selectMode} onSelectMode={enterSelectMode} onSelectDone={clearSelection}
         sidebarWidth={isDesktop ? sidebarWidth : 0}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        hasSidebarNotes={sidebarNotes.length > 0}
       />
 
       {selected.size > 0 && (
@@ -293,14 +310,14 @@ export default function App() {
         />
       )}
 
-      <main className="px-3 sm:px-6 pb-28 pt-4 safe-bottom max-w-6xl mx-auto" style={isDesktop ? { marginRight: sidebarWidth } : undefined}>
+      <main className="px-3 sm:px-6 pt-4 safe-bottom max-w-6xl mx-auto" style={isDesktop ? { marginRight: sidebarWidth } : undefined}>
         {view === 'notes' && (
           <div className="mb-5 bg-surface border border-border rounded-xl2 shadow-sm flex items-center gap-2 px-4 py-3 cursor-text hover:shadow-md transition-shadow"
             onClick={() => startQuick(false)}>
             <Plus size={18} className="text-muted" />
             <span className="text-muted text-sm flex-1">Take a note…</span>
-            <button onClick={(e) => { e.stopPropagation(); startQuick(false, true) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="New checklist note"><CheckSquare size={18} /></button>
-            <button onClick={(e) => { e.stopPropagation(); startQuick(true) }} className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="New reminder note"><Bell size={18} /></button>
+            <button onClick={(e) => { e.stopPropagation(); startQuick(false, true) }} className="p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="New checklist note"><CheckSquare size={18} /></button>
+            <button onClick={(e) => { e.stopPropagation(); startQuick(true) }} className="p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="New reminder note"><Bell size={18} /></button>
           </div>
         )}
 
@@ -403,44 +420,50 @@ function TopBar(props: any) {
   ] as const
 
   return (
-    <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-lg border-b border-border">
+    <header className="sticky top-0 z-20 bg-bg/80 backdrop-blur-lg border-b border-border safe-top">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2" style={{ paddingRight: Math.max(24, props.sidebarWidth || 0) }}>
         <div className="relative flex-1 max-w-xl">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input value={props.query} onChange={(e) => props.setQuery(e.target.value)} placeholder="Search notes"
-            className="w-full bg-surface border border-border rounded-full pl-9 pr-3 py-2 text-sm outline-none focus:border-amber-500 transition-colors" />
+            className="w-full bg-surface border border-border rounded-full pl-9 pr-3 py-2.5 text-sm outline-none focus:border-amber-500 transition-colors" />
         </div>
+        {props.hasSidebarNotes && (
+          <button onClick={props.onToggleSidebar}
+            className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="Sidebar">
+            <PanelRight size={19} />
+          </button>
+        )}
         <button onClick={() => props.setLayout(props.layout === 'grid' ? 'list' : 'grid')}
-          className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Toggle view">
+          className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="Toggle view">
           {props.layout === 'grid' ? <List size={19} /> : <LayoutGrid size={19} />}
         </button>
-        <button onClick={props.toggleTheme} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title={`Theme: ${props.themeMode}`}>
+        <button onClick={props.toggleTheme} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title={`Theme: ${props.themeMode}`}>
           {props.themeMode === 'system' ? <Monitor size={19} /> : props.themeMode === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
         </button>
         {props.selectMode ? (
           <button onClick={props.onSelectDone}
-            className="px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors">Done</button>
+            className="px-3 py-2 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors min-h-[44px]">Done</button>
         ) : (
           <button onClick={props.onSelectMode}
-            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted" title="Select notes">
+            className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center" title="Select notes">
             <Check size={19} />
           </button>
         )}
         <div className="relative" data-menu-dropdown>
-          <button onClick={() => props.setMenuOpen(!props.menuOpen)} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted">
+          <button onClick={() => props.setMenuOpen(!props.menuOpen)} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted min-w-[44px] min-h-[44px] flex items-center justify-center">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </button>
           {props.menuOpen && (
             <motion.div data-menu-dropdown initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
               className="absolute right-0 mt-2 w-52 bg-surface border border-border rounded-xl shadow-xl z-30 py-1.5 overflow-hidden">
               <button onClick={() => { props.onSettings(); props.setMenuOpen(false) }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors min-h-[44px]">
                 <Settings size={16} /> Settings
               </button>
               <div className="border-t border-border my-1.5" />
-              <div className="px-4 py-1.5 text-xs text-muted truncate">{props.email}</div>
+              <div className="px-4 py-2 text-xs text-muted truncate">{props.email}</div>
               <button onClick={() => { props.signOut(); props.setMenuOpen(false) }}
-                className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors">Sign out</button>
+                className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors min-h-[44px]">Sign out</button>
             </motion.div>
           )}
         </div>
@@ -492,14 +515,14 @@ function SelectionBar(props: any) {
     <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
       className="fixed top-0 inset-x-0 z-30 bg-surface border-b border-border shadow-md">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 py-2.5 flex items-center gap-2" style={{ paddingRight: Math.max(24, props.sidebarWidth || 0) }}>
-        <button onClick={props.onClear} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10"><X size={19} /></button>
+        <button onClick={props.onClear} className="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={19} /></button>
         <span className="text-sm font-medium">{props.count} selected</span>
-        <button onClick={props.onSelectAll} className="text-sm text-amber-500 hover:text-amber-600 ml-2 font-medium">
+        <button onClick={props.onSelectAll} className="text-sm text-amber-500 hover:text-amber-600 ml-2 font-medium min-h-[44px] px-2">
           {props.count === props.total ? 'Deselect all' : 'Select all'}
         </button>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1 overflow-x-auto">
           {actions.map(([label, Icon, fn]: any) => (
-            <button key={label} onClick={fn} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+            <button key={label} onClick={fn} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm hover:bg-black/5 dark:hover:bg-white/10 transition-colors min-h-[44px] whitespace-nowrap">
               <Icon size={17} /> <span className="hidden sm:inline">{label}</span>
             </button>
           ))}

@@ -136,28 +136,28 @@ function ReminderCard({
             <div className="flex items-center gap-2 bg-red-100 dark:bg-red-900/50 rounded-lg p-2">
               <AlertTriangle size={14} className="text-red-600 dark:text-red-400 shrink-0" />
               <span className="text-xs text-red-700 dark:text-red-300 flex-1">Mark as completed?</span>
-              <button onClick={onConfirmNo} className="text-xs px-2 py-1 rounded text-muted hover:bg-white/50 dark:hover:bg-black/20">No</button>
-              <button onClick={onConfirmYes} className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600">Yes</button>
+              <button onClick={onConfirmNo} className="text-xs px-3 py-2 rounded min-h-[44px] text-muted hover:bg-white/50 dark:hover:bg-black/20">No</button>
+              <button onClick={onConfirmYes} className="text-xs px-3 py-2 rounded bg-red-500 text-white hover:bg-red-600 min-h-[44px]">Yes</button>
             </div>
           ) : (
             <div className="flex gap-2">
               <button
                 onClick={onSnooze}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors min-h-[44px]"
               >
                 <Timer size={14} />
                 Snooze 1 day
               </button>
               <button
                 onClick={onComplete}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white text-xs font-semibold transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-xs font-semibold transition-colors min-h-[44px]"
               >
                 <Check size={14} />
                 Complete
               </button>
               <button
                 onClick={onHide}
-                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/50 text-muted text-xs font-semibold transition-colors border border-red-200 dark:border-red-800"
+                className="flex items-center justify-center gap-1 px-2.5 py-2.5 rounded-xl bg-white/60 dark:bg-black/30 hover:bg-white/80 dark:hover:bg-black/50 text-muted text-xs font-semibold transition-colors border border-red-200 dark:border-red-800 min-w-[44px] min-h-[44px]"
                 title="Hide until next reload"
               >
                 <EyeOff size={14} />

@@ -98,10 +98,10 @@ export default function RemindersConsolidated() {
                       <div className="ml-12 space-y-1.5">
                         {tasks.map((t) => (
                           <div key={t.id} className="flex items-center gap-2">
-                            <span className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                            <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
                               t.checked ? 'bg-amber-500 border-amber-500' : 'border-muted/40'
                             }`}>
-                              {t.checked && <Check size={10} strokeWidth={3} className="text-white" />}
+                              {t.checked && <Check size={12} strokeWidth={3} className="text-white" />}
                             </span>
                             <span className={`text-sm ${t.checked ? 'line-through text-muted' : ''}`}>
                               {t.text || '(empty task)'}
