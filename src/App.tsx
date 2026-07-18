@@ -156,6 +156,16 @@ export default function App() {
   const openNote = useMemo(() => notes.find((n) => n.id === openId) || null, [notes, openId])
   const trashCount = useMemo(() => notes.filter((n) => n.trashed).length, [notes])
 
+  // close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-menu-dropdown]')) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
   if (!user) return <AuthScreen />
 
@@ -179,16 +189,6 @@ export default function App() {
     if (n) updateNote(id, { lines: n.lines.map((l) => (l.type === 'task' ? { ...l, checked: false } : l)) })
   }
   const enterSelectMode = () => { setSelectMode(true); setSelected(new Set()) }
-
-  // close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return
-    const handler = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-menu-dropdown]')) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [menuOpen])
 
   const addToSidebar = (id: string) => {
     setSidebarNotes((prev) => prev.includes(id) ? prev : [...prev, id])
