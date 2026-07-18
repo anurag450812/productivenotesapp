@@ -101,7 +101,7 @@ function SortableLine({
         {...attributes}
         {...listeners}
         className="mt-1.5 shrink-0 p-0.5 rounded cursor-grab active:cursor-grabbing text-muted/30 hover:text-amber-500 transition-colors touch-none"
-        onPointerDown={(e) => { listeners.onPointerDown?.(e as any); e.stopPropagation() }}
+        onPointerDown={(e) => { listeners?.onPointerDown?.(e as any); e.stopPropagation() }}
       >
         <GripVertical size={14} />
       </div>
