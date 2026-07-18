@@ -20,7 +20,7 @@ interface Props {
 }
 
 export default function NoteEditor({ note, onClose }: Props) {
-  const { updateNote, saveNoteNow, trashNote, addNote } = useNotes()
+  const { updateNote, saveNoteNow, trashNote, addNote, deleteForever } = useNotes()
   const { theme } = useTheme()
   const { user } = useAuth()
   const { settings } = useSettings()
@@ -44,6 +44,13 @@ export default function NoteEditor({ note, onClose }: Props) {
   const bd = noteBorder(local.color, theme === 'dark')
 
   const close = async () => {
+    const hasContent = local.title.trim() !== '' || local.lines.some((l) => l.text.trim() !== '') || local.image_url
+    if (!hasContent) {
+      try { await deleteForever(note.id) } catch { /* ignore */ }
+      dirtyRef.current = false
+      onClose()
+      return
+    }
     try { await saveNoteNow(note.id) } catch { /* ignore save errors on close */ }
     dirtyRef.current = false
     onClose()

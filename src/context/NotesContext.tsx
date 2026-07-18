@@ -171,7 +171,6 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       const maxPos = notesRef.current.reduce((max, n) => Math.max(max, n.position ?? 0), -1)
       const note = createBlankNote(user.id, { position: maxPos + 1, ...overrides })
       setNotes((prev) => [note, ...prev])
-      upsertNote(note).catch((e) => console.error('addNote save', e))
       return note
     },
     [user]
