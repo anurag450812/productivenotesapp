@@ -15,7 +15,7 @@ interface Props {
   selected: boolean
   selectionMode: boolean
   view: 'grid' | 'list'
-  onOpen: () => void
+  onOpen: (rect?: DOMRect) => void
   onToggleSelect: () => void
   onLongPress: () => void
   onPin?: () => void
@@ -61,10 +61,10 @@ export default function NoteCard({ note, selected, selectionMode, view, onOpen, 
     if (pressTimer.current) clearTimeout(pressTimer.current)
   }
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     if (pressed.current) { pressed.current = false; return }
     if (selectionMode) { onToggleSelect(); return }
-    onOpen()
+    onOpen((e.currentTarget as HTMLElement).getBoundingClientRect())
   }
 
   return (

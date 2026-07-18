@@ -16,10 +16,11 @@ import { useAuth } from '@/context/AuthContext'
 
 interface Props {
   note: Note
+  noteRect?: DOMRect | null
   onClose: () => void
 }
 
-export default function NoteEditor({ note, onClose }: Props) {
+export default function NoteEditor({ note, noteRect, onClose }: Props) {
   const { updateNote, saveNoteNow, trashNote, addNote, deleteForever } = useNotes()
   const { theme } = useTheme()
   const { user } = useAuth()
@@ -97,15 +98,16 @@ export default function NoteEditor({ note, onClose }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
       onClick={close}
     >
       <motion.div
-        className="w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden animate-pop"
+        className="w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden"
         style={{ backgroundColor: bg, borderColor: bd, borderWidth: 1 }}
-        initial={{ y: 30, scale: 0.98 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 20, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+        initial={{ scale: 0.92, opacity: 0, y: 24 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* image */}

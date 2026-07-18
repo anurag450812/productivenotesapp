@@ -33,6 +33,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
+  const [noteRect, setNoteRect] = useState<DOMRect | null>(null)
 
   useEffect(() => { localStorage.setItem('layout', layout) }, [layout])
 
@@ -114,8 +115,9 @@ export default function App() {
     reorderNotes(active.id as string, over.id as string, section)
   }
 
-  const handleNoteOpen = (id: string) => {
+  const handleNoteOpen = (id: string, rect?: DOMRect) => {
     if (selectionMode) { toggleSelect(id); return }
+    setNoteRect(rect || null)
     setOpenId(id)
   }
 
@@ -227,7 +229,7 @@ export default function App() {
       )}
 
       <AnimatePresence>
-        {openNote && <NoteEditor note={openNote} onClose={() => setOpenId(null)} />}
+        {openNote && <NoteEditor note={openNote} noteRect={noteRect} onClose={() => { setNoteRect(null); setOpenId(null) }} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -360,7 +362,7 @@ function NotesGrid(props: any) {
       {notes.map((n: Note) => (
         <div key={n.id} data-note-card={n.id} className="break-inside-avoid mb-3">
           <NoteCard note={n} selected={selected.has(n.id)} selectionMode={selectionMode} view={layout}
-            onOpen={() => onOpen(n.id)} onToggleSelect={() => onToggleSelect(n.id)} onLongPress={() => onLongPress(n.id)}
+            onOpen={(rect?: DOMRect) => onOpen(n.id, rect)} onToggleSelect={() => onToggleSelect(n.id)} onLongPress={() => onLongPress(n.id)}
             onPin={() => onUpdateNote(n.id, { pinned: !n.pinned })} />
         </div>
       ))}
