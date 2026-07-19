@@ -119,7 +119,7 @@ function SortableLine({
         <button
           type="button"
           onClick={() => onToggleCheck(line.id)}
-          className={`mt-1 shrink-0 p-2 -m-2 rounded-md transition-all flex items-center justify-center min-w-[44px] min-h-[44px]`}
+          className={`shrink-0 p-2 -m-2 rounded-md transition-all flex items-center justify-center min-w-[44px] min-h-[44px]`}
           aria-label={line.checked ? 'Mark incomplete' : 'Mark complete'}
         >
           <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${

@@ -159,12 +159,12 @@ function NoteCard({ note, selected, selectionMode, view, onOpen, onToggleSelect,
               {previewLines.map((l) => (
                 <div
                   key={l.id}
-                  className={`flex items-center gap-1.5 truncate ${
+                  className={`flex items-start gap-1.5 truncate ${
                     l.type === 'heading' ? 'font-semibold' : ''
                   } ${l.type === 'task' && l.checked ? 'line-through text-muted' : ''}`}
                 >
                   {l.type === 'task' && note.show_checkboxes && (
-                    <span className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${l.checked ? 'bg-amber-500 border-amber-500' : 'border-muted/50'}`}>
+                    <span className={`w-3 h-3 mt-px rounded-sm border flex items-center justify-center shrink-0 ${l.checked ? 'bg-amber-500 border-amber-500' : 'border-muted/50'}`}>
                       {l.checked && <Check size={9} strokeWidth={3} className="text-white" />}
                     </span>
                   )}
