@@ -1,13 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronRight, Pin, Check, GripVertical } from 'lucide-react'
+import { X, ChevronRight, Pin, GripVertical } from 'lucide-react'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { Note } from '@/lib/types'
+import type { Note, NoteLine } from '@/lib/types'
 import { useTheme } from '@/context/ThemeContext'
 import { noteBg, noteBorder } from '@/lib/colors'
+import LineEditor from './LineEditor'
 
 interface Props {
   open: boolean
@@ -17,7 +18,7 @@ interface Props {
   onRemove: (id: string) => void
   onReorder: (newOrder: string[]) => void
   isDragging?: boolean
-  onToggleTask?: (noteId: string, lineId: string) => void
+  onUpdateNote?: (noteId: string, patch: Partial<Note>) => void
   width: number
   onWidthChange?: (w: number) => void
 }
@@ -26,7 +27,7 @@ const MIN_W = 240
 const MAX_W = 600
 const DEFAULT_W = 320
 
-export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReorder, isDragging, onToggleTask, width, onWidthChange }: Props) {
+export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReorder, isDragging, onUpdateNote, width, onWidthChange }: Props) {
   const { theme } = useTheme()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -121,7 +122,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
                   isExpanded={expandedId === note.id}
                   onToggle={() => setExpandedId(expandedId === note.id ? null : note.id)}
                   onRemove={() => onRemove(note.id)}
-                  onToggleTask={onToggleTask}
+                  onUpdateNote={onUpdateNote}
                   theme={theme}
                 />
               ))}
@@ -133,7 +134,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
       {/* footer */}
       {sidebarNotes.length > 0 && (
         <div className="px-4 py-2.5 border-t border-border shrink-0 text-center">
-          <p className="text-[11px] text-muted">Drag to reorder · Click headings to expand · Drag edge to resize</p>
+          <p className="text-[11px] text-muted">Drag to reorder · Click to expand & edit · Drag edge to resize</p>
         </div>
       )}
     </div>
@@ -169,13 +170,13 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
 }
 
 function SortableSidebarCard({
-  note, isExpanded, onToggle, onRemove, onToggleTask, theme
+  note, isExpanded, onToggle, onRemove, onUpdateNote, theme
 }: {
   note: Note
   isExpanded: boolean
   onToggle: () => void
   onRemove: () => void
-  onToggleTask?: (noteId: string, lineId: string) => void
+  onUpdateNote?: (noteId: string, patch: Partial<Note>) => void
   theme: string
 }) {
   const {
@@ -195,7 +196,10 @@ function SortableSidebarCard({
   }
 
   const heading = note.title || note.lines.find((l) => l.text.trim())?.text || 'Untitled'
-  const contentLines = note.lines.filter((l) => l.text.trim())
+
+  const handleLinesChange = (newLines: NoteLine[]) => {
+    onUpdateNote?.(note.id, { lines: newLines })
+  }
 
   return (
     <motion.div
@@ -240,7 +244,7 @@ function SortableSidebarCard({
           </button>
         </div>
 
-        {/* expandable content */}
+        {/* expandable content — full LineEditor */}
         <AnimatePresence initial={false}>
           {isExpanded && (
             <motion.div
@@ -250,33 +254,12 @@ function SortableSidebarCard({
               transition={{ duration: 0.2, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              <div className="px-3 pb-3 text-sm text-text/80 space-y-1 border-t border-black/5 dark:border-white/5 pt-2">
-                {contentLines.length === 0 ? (
-                  <p className="text-xs text-muted italic">Empty note</p>
-                ) : (
-                  contentLines.map((l) => (
-                    <div
-                      key={l.id}
-                      className={`flex items-start gap-1.5 leading-relaxed ${
-                        l.type === 'heading' ? 'font-semibold text-text mt-2' : ''
-                      }`}
-                    >
-                      {l.type === 'task' && note.show_checkboxes && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onToggleTask?.(note.id, l.id) }}
-                          className={`mt-1.5 w-3 h-3 rounded-sm border shrink-0 flex items-center justify-center transition-colors ${
-                            l.checked ? 'bg-amber-500 border-amber-500' : 'border-muted/50 hover:border-amber-500/50'
-                          }`}
-                        >
-                          {l.checked && <Check size={9} strokeWidth={3} className="text-white" />}
-                        </button>
-                      )}
-                      <span className={`${l.type === 'task' && l.checked ? 'line-through text-muted' : ''} break-words`}>
-                        {l.text}
-                      </span>
-                    </div>
-                  ))
-                )}
+              <div className="px-2 pb-2 border-t border-black/5 dark:border-white/5 pt-2">
+                <LineEditor
+                  lines={note.lines}
+                  showCheckboxes={note.show_checkboxes}
+                  onChange={(newLines) => handleLinesChange(newLines)}
+                />
               </div>
             </motion.div>
           )}

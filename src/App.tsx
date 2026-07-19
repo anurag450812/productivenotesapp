@@ -254,13 +254,6 @@ export default function App() {
   const reorderSidebar = (newOrder: string[]) => setSidebarNotes(newOrder)
   const bulkAddToSidebar = () => { selected.forEach(addToSidebar); clearSelection() }
 
-  const toggleSidebarTask = (noteId: string, lineId: string) => {
-    const note = notes.find((n) => n.id === noteId)
-    if (!note) return
-    const updatedLines = note.lines.map((l) => l.id === lineId ? { ...l, checked: !l.checked } : l)
-    updateNote(noteId, { lines: updatedLines })
-  }
-
   const handleDragEnd = (event: DragEndEvent, section: 'pinned' | 'others') => {
     const { active, over } = event
     setIsDragging(false)
@@ -398,7 +391,7 @@ export default function App() {
       {isDesktop && (
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} width={sidebarWidth}
           noteIds={sidebarNotes} notes={notes} onRemove={removeFromSidebar} onReorder={reorderSidebar}
-          isDragging={isDragging} onToggleTask={toggleSidebarTask} onWidthChange={setSidebarWidth} />
+          isDragging={isDragging} onUpdateNote={updateNote} onWidthChange={setSidebarWidth} />
       )}
 
       <AnimatePresence>
