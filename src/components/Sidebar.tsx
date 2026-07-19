@@ -161,7 +161,7 @@ export default function Sidebar({ open, onClose, noteIds, notes, onRemove, onReo
       </div>
 
       {/* desktop: permanent panel */}
-      <div className="hidden sm:block fixed right-0 top-0 bottom-0 z-[55]" style={{ width }}>
+      <div className="hidden sm:block fixed right-0 top-0 bottom-0 z-[48]" style={{ width }}>
         {sidebarContent}
       </div>
     </>
